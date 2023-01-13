@@ -1,0 +1,1308 @@
+---
+title: "PPD analysis"
+author: "Cassava program data analyst"
+format: html
+code-fold: true
+code-tools: true
+editor: visual
+---
+
+# Introduction
+
+This is a document showing the data analysis from the genetic study of tolerance and susceptibility to post harvest physiological deterioration in cassava. To learn more about methodology used, see: <https://www.youtube.com/watch?v=iEkVcGHxeYY>.
+
+## load the libraries
+
+```{r}
+rm(list = ls())
+library(pacman)
+pacman::p_load(tidyverse, fauxnaif, readxl, yarrr, dplyr, knitr, rmarkdown, statgenSTA, statgenGxE, openxlsx, QBMS, magrittr, agriutilities, asreml)
+source("utilities_tidy.R")
+```
+
+
+
+## Load the files to check
+
+```{r}
+
+local_file <- "yes" # "no"
+
+if (local_file == "yes") {
+  folder <- "D:\\OneDrive - CGIAR\\Data Analysis\\PPD\\data_v2\\"
+  file <- "phenotype1.csv" # phenotype.csv <- BCGN1, phenotype1.csv <- PDGN1
+  skip_col <- 0 # double check the number of col skipped
+  # trial_interest = "BCGN1"
+  trial_interest <- "PDGN1" # ---------choose one
+  year_interest <- 2021
+}
+
+
+# 1) load the data
+
+sel_data <- read_cassavabase(phenotypeFile = paste0(folder, file))
+```
+
+## Change columns into standar names
+
+```{r}
+# ---- Change columns into standar names ----
+
+sel_data_kp <- change_colname(sel_data, NA)
+```
+
+## Filter observationLevel == "plot"
+
+It is necessary filter the rows correspond to "plot", because in this way, I'm removing the PPD evaluations and I'm keeping the rest.
+
+```{r}
+# sel_data_kp %<>% filter(observationLevel == "plot")
+```
+
+# Remove genotypes due to non comercials roots
+
+```{r}
+if (TRUE) {
+  dele_geno <- read_excel(paste0(folder, "Materiales a eliminar de ensayo 13-21.xlsx"),
+    sheet = "Sheet2"
+  )
+
+  # select 13_21 trial for selection size root
+  PDGN1201280 <- sel_data_kp %>% filter(str_detect(use_trial_name, "201280PDGN1_ciat"))
+
+  PDGN1201280 <- PDGN1201280 %>% filter(!use_accession_name %in% dele_geno$Genotype)
+
+
+  sel_data_kp <- sel_data_kp %>%
+    filter(!str_detect(use_trial_name, "201280PDGN1_ciat")) %>%
+    bind_rows(PDGN1201280)
+}
+```
+
+
+## change the column class
+
+```{r}
+obs_col <- c(
+  names(sel_data_kp)[str_detect(names(sel_data_kp), "obs_")],
+  "use_rep_number", "blockNumber",
+  "use_plot_number", "use_plot_width",
+  "use_plot_length"
+)
+
+sel_data_kp %<>%
+  mutate(across(all_of(obs_col), as.numeric))
+```
+
+# Check the clone name
+
+```{r}
+cloneName_new_old <- check_clone_name(
+  clone_list = sel_data_kp$use_accession_name,
+  new_names = NA,
+  add_check = NULL
+)
+
+trial_standard <- sel_data_kp %>%
+  left_join(cloneName_new_old,
+    by = c("use_accession_name" = "accession_name_ori")
+  ) %>%
+  select(-use_accession_name) %>%
+  rename(use_accession_name = use_accession_name.y)
+```
+
+## Add GIS data
+
+```{r}
+trial_standard <- add_GIS(trial_standard)
+```
+
+## Meta information
+
+```{r}
+# meta information
+meta_info <- names(trial_standard)[str_detect(names(trial_standard), "use_")]
+meta_info <- gsub("use_", "", meta_info)
+print("The meta information cols are: ")
+meta_info
+trial_tidy <- trial_standard
+names(trial_tidy) <- gsub("use_", "", names(trial_standard))
+```
+
+## Observations
+
+```{r}
+# observations
+trait_list <- names(trial_tidy)[str_detect(names(trial_tidy), "obs_")]
+trait_list <- gsub("obs_", "", trait_list)
+print("The observation cols are: ")
+trait_list
+names(trial_tidy) <- gsub("obs_", "", names(trial_tidy))
+trial_tidy <- trial_tidy[c(meta_info, trait_list)]
+
+if (trial_interest == "BCGN1") {
+  # fix some aditional error
+  trial_tidy %<>% mutate(
+    DM_raw_10mon =
+      ifelse(plot_name == "201681BCGN1_ciat_rep1_GM3736-73_96", 33.90, DM_raw_10mon)
+  )
+}
+```
+
+# Save the tidy file in local folder
+
+```{r, eval=FALSE}
+# save the tidy data on my computer
+
+meta_file_name <- paste("01_", year_interest, trial_interest, "_tidy_data_",
+  Sys.Date(), ".csv",
+  sep = ""
+)
+
+write.csv(trial_tidy, file = here::here("data_v2", meta_file_name), row.names = F)
+```
+
+## Plot the variation among traits
+
+```{r, warning=FALSE}
+
+# remove columns with all NA
+my_dat_noNA <- trial_tidy[, colSums(is.na(trial_tidy)) < nrow(trial_tidy)]
+trait_wanted <- names(my_dat_noNA)[names(my_dat_noNA) %in% trait_list]
+
+
+for (i in 1:length(trait_wanted)) {
+  y_DATA <- my_dat_noNA[[trait_wanted[i]]] # data frame or vector?
+  x_DATA <- my_dat_noNA$trial_name
+  my_DATA <- my_dat_noNA
+  y_LABEL <- trait_wanted[i]
+  x_LABEL <- NULL
+  TITLE <- NULL
+  y_MAX <- max(y_DATA, na.rm = TRUE) * 1.2
+  y_MIN <- 0
+
+  plot_box <- ggplot(my_DATA, aes(x = x_DATA, y = y_DATA)) +
+    geom_violin(trim = FALSE, fill = "gray") +
+    geom_boxplot(width = 0.2) +
+    coord_cartesian(ylim = c(y_MIN, y_MAX)) +
+    theme_xiaofei() +
+    labs(
+      y = y_LABEL, x = x_LABEL,
+      title = TITLE
+    )
+  plot(plot_box)
+}
+```
+
+## Save the plot variation in my local folder
+
+```{r eval=FALSE}
+BOXPLOT_VAR(my_dat = trial_tidy)
+```
+
+## Get the shared clones
+
+```{r eval=FALSE}
+CLONE_CT(my_dat = trial_tidy)
+```
+
+## Select traits for the analysis
+
+```{r}
+# select traits for the analysis
+
+no_analysis_trait <- c(
+  "harvest_number_plan", "harvest_number", # yield calculation
+  "root_weight_air", "root_weight_water", # DM calculation
+  "planted_number_plot", "germinated_number_plot", # germination calculation
+  "root_weight_plot", # yield calculation
+  "CBB_3mon", "shoot_weight_plot",
+  "DM_NIRS", "DM_oven", "carotenoidtotal_hplc_11mon", "carotenoidtotal_hplc_8mon",
+  "betacarotenoid_hplc_11mon", "betacarotenoid_hplc_8mon",
+  "harvest_index", "flesh_color_25center1-8", "flesh_color_50inner1-8"
+)
+
+my_dat_noNA <- trial_tidy[, colSums(is.na(trial_tidy)) < nrow(trial_tidy)]
+trait_wanted <- names(my_dat_noNA)[names(my_dat_noNA) %in% trait_list]
+analysis_trait <- trait_wanted[!trait_wanted %in% no_analysis_trait] # ----- updated below
+
+
+# remove traits without variation
+trial_tidy <- remove_no_var(my_dat = trial_tidy)
+# update analysis_trait
+analysis_trait <- analysis_trait[analysis_trait %in% names(trial_tidy)]
+# re-run to double check
+trial_tidy <- remove_no_var(my_dat = trial_tidy)
+```
+
+## Save the tidy data for analysis in my computer
+
+```{r eval=FALSE}
+write.csv(trial_tidy, paste(folder, "01_", year_interest, trial_interest,
+  "_tidy_data4analysis_", Sys.Date(), ".csv",
+  sep = ""
+),
+row.names = FALSE
+)
+```
+
+# Data analysis
+
+## Required information
+
+```{r}
+experiment <- "PPD_8_years"
+master_data <- list() # master list
+trial_folder <- folder
+year_interest <- 2021
+# trial_interest = "BCGN1"
+trial_interest <- "PDGN1" #----------------choose one
+```
+
+## Load the tidy data for analisys
+
+```{r}
+trial_set_number <- 1 # how many trial sets?
+# all files in the folder
+list_file <- list.files(trial_folder)
+# tidy data of the trials interested
+sel_file <- list_file[str_detect(list_file, "_tidy_data4analysis_") &
+  str_detect(
+    list_file,
+    paste(year_interest, trial_interest, sep = "")
+  )]
+sel_file
+# the data we will use
+sel_file_use <- sel_file[1]
+
+trial1_tidy <- read.csv(paste0(trial_folder, sel_file_use),
+  header = TRUE,
+  stringsAsFactors = FALSE,
+  as.is = T,
+  check.names = FALSE
+)
+
+
+# compare and merge the data of trial sets --------------------------------
+# Here are the data of all trials:
+
+if (trial_set_number == 1) {
+  trial_tidy_all <- trial1_tidy
+}
+```
+
+## Obtain all the trait information using a cloud file (gitHub) -------
+
+```{r}
+trait_all <-
+  read.csv("https://raw.githubusercontent.com/lfdelgadom/standar_col_names_CB/main/standar_col_names.csv") %>%
+  select(analysis_col_name) %>%
+  filter(str_detect(analysis_col_name, "obs_"))
+trait_all_adj <- gsub("obs_", "", trait_all$analysis_col_name)
+# trait_all_adj = c(trait_all_adj,
+#                   "harvest_number_plan", "germination_perc",
+#                   "yield_ha_v3", "DM_yield_v3")
+trait_all_adj <- gsub("-", "_", trait_all_adj)
+```
+
+## Meta info.
+
+```{r}
+
+meta_all <-
+  read.csv("https://raw.githubusercontent.com/lfdelgadom/standar_col_names_CB/main/standar_col_names.csv") %>%
+  select(analysis_col_name) %>%
+  filter(str_detect(analysis_col_name, "use_"))
+meta_all_adj <- gsub("use_", "", meta_all$analysis_col_name)
+meta_all_adj <- c(
+  meta_all_adj,
+  "check_released", "latitude", "longitude",
+  "altitude", "department", "country",
+  "ag_zone", "location_short"
+)
+```
+
+## Select the meta information and observations for analysis
+
+```{r}
+names(trial_tidy_all) <- gsub("-", "_", names(trial_tidy_all))
+analysis_trait_v1 <- names(trial_tidy_all)[names(trial_tidy_all) %in% trait_all_adj]
+
+print("All the traits investigated:")
+print(analysis_trait_v1)
+
+meta_col <- names(trial_tidy_all)[names(trial_tidy_all) %in% meta_all_adj]
+
+print("All the meta information:")
+print(meta_col)
+```
+
+## Trait ideal
+
+```{r}
+trait_ideal <- c(
+  "DM_raw_10mon",
+  "DM_raw_11mon",
+  "DM_raw_12mon",
+  "DM_gravity",
+  "plant_type",
+  "yield_ha",
+  "branch_number",
+  "height",
+  "height_1st_branch",
+  "height_wt_leaf",
+  "root_number_commercial",
+  "root_type1_5",
+  "root_skin_color1_3",
+  "vigor1_5",
+  "lodging1_3",
+  "yield_ha_12mon",
+  "cook_time_10mon",
+  "cook_time_12mon",
+  "HCN_linamarase_10mon",
+  "HCN_linamarase_11mon",
+  "HCN_linamarase_12mon",
+  "betacarotenoid_nirs_10mon",
+  "carotenoidtotal_nirs_10mon",
+  "betacarotenoid_nirs_11mon",
+  "carotenoidtotal_nirs_11mon",
+  "PPD_day7_10mon",
+  "PPD_day7_12mon"
+)
+
+trait_wanted <- analysis_trait_v1[analysis_trait_v1 %in%
+  trait_ideal]
+```
+
+## Fixing some errors
+
+```{r}
+if (trial_interest == "BCGN1") {
+  trial_tidy_all <- trial_tidy_all %>%
+    mutate(
+      HCN_linamarase_10mon =
+        ifelse(trial_name == "201681BCGN1_ciat" | plot_name == "201681BCGN1_ciat_rep1_GM3732-13_15", NA, HCN_linamarase_10mon)
+    )
+}
+```
+
+## Reshape the data
+
+```{r}
+vars_10mon <- trial_tidy_all %>%
+  select(all_of(trait_wanted)) %>%
+  select(matches("10mon"), !contains("mon")) %>%
+  colnames()
+
+vars_11mon <- trial_tidy_all %>%
+  select(all_of(trait_wanted)) %>%
+  select(matches("11mon")) %>%
+  colnames()
+
+vars_12mon <- trial_tidy_all %>%
+  select(all_of(trait_wanted)) %>%
+  select(matches("12mon")) %>%
+  colnames()
+
+trials_10mon <- trial_tidy_all %>%
+  select(year, trial_name, plot_name, accession_name, rep_number, all_of(vars_10mon)) %>%
+  dplyr::mutate(trial_name = paste0(trial_name, "_10"))
+
+if (trial_interest == "BCGN1") {
+  trials_11mon <- trial_tidy_all %>%
+    select(year, trial_name, plot_name, accession_name, rep_number, all_of(vars_11mon)) %>%
+    dplyr::mutate(trial_name = paste0(trial_name, "_11"))
+}
+
+trials_12mon <- trial_tidy_all %>%
+  select(year, trial_name, plot_name, accession_name, rep_number, all_of(vars_12mon)) %>%
+  dplyr::mutate(trial_name = paste0(trial_name, "_12"))
+```
+
+```{r}
+# bind the trials BC population
+if (trial_interest == "BCGN1") { # fix this pivot on BCGN1 population
+  my_dat <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
+    pivot_longer(
+      cols = starts_with("beta"),
+      names_to = "betacarotenoid_nirs_var",
+      values_to = "betacarotenoid_nirs"
+    ) %>%
+    pivot_longer(
+      cols = starts_with("carote"),
+      names_to = "carotenoidtotal_nirs_var",
+      values_to = "carotenoidtotal_nirs"
+    ) %>%
+    pivot_longer(
+      cols = starts_with("cook"),
+      names_to = "cook_time_var",
+      values_to = "cook_time"
+    ) %>%
+    pivot_longer(
+      cols = starts_with("DM_raw"),
+      names_to = "DM_raw_var",
+      values_to = "DM_raw"
+    ) %>%
+    pivot_longer(
+      cols = starts_with("yield"),
+      names_to = "yield_ha_var",
+      values_to = "yield_ha"
+    ) %>%
+    pivot_longer(
+      cols = starts_with("HCN"),
+      names_to = "HCN_linamarase_var",
+      values_to = "HCN_linamarase"
+    ) %>%
+    select(-ends_with("var")) %>%
+    distinct()
+}
+
+
+if (trial_interest == "PDGN1") {
+  cooking_time <- bind_rows(trials_10mon, trials_12mon) %>%
+    select(trial_name, plot_name, starts_with("cook")) %>%
+    pivot_longer(
+      cols = starts_with("cook"),
+      names_to = "cook_time_var",
+      values_to = "cook_time"
+    ) %>%
+    select(-ends_with("var")) %>%
+    drop_na() %>%
+    distinct()
+
+  DM <- bind_rows(trials_10mon, trials_12mon) %>%
+    select(trial_name, plot_name, starts_with("DM_raw")) %>%
+    pivot_longer(
+      cols = starts_with("DM_raw"),
+      names_to = "DM_raw_var",
+      values_to = "DM_raw"
+    ) %>%
+    select(-ends_with("var")) %>%
+    drop_na() %>%
+    distinct()
+
+  HCN <- bind_rows(trials_10mon, trials_12mon) %>%
+    select(trial_name, plot_name, starts_with("HCN")) %>%
+    pivot_longer(
+      cols = starts_with("HCN"),
+      names_to = "HCN_linamarase_var",
+      values_to = "HCN_linamarase"
+    ) %>%
+    select(-ends_with("var")) %>%
+    drop_na() %>%
+    distinct()
+
+  yield <- bind_rows(trials_10mon, trials_12mon) %>%
+    select(trial_name, plot_name, starts_with("yield")) %>%
+    pivot_longer(
+      cols = starts_with("yield"),
+      names_to = "yield_ha_var",
+      values_to = "yield_ha"
+    ) %>%
+    select(-ends_with("var")) %>%
+    drop_na() %>%
+    distinct()
+}
+```
+
+## PPD data treatment
+
+PPD data need an extra data treatment. The data need to be grouped and summarized by the mean across plants and slices (Wheatley, C.C. (1982))
+
+```{r}
+
+# pivot the columns start with "PPD" and remove all NAs values.
+PPD <- bind_rows(trials_10mon, trials_12mon) %>%
+  select(trial_name, plot_name, starts_with("PPD")) %>%
+  pivot_longer(
+    cols = starts_with("PPD"),
+    names_to = "PPD_var",
+    values_to = "PPD"
+  ) %>%
+  select(-ends_with("var")) %>%
+  drop_na() %>%
+  distinct()
+
+# Function to separate the special column "plot_name". Is necessary format the column
+# according to the usual plot_name.
+
+PPD <- PPD %>%
+  filter(
+    str_detect(plot_name, "Slice")
+  ) %>%
+  mutate(
+    Plot_name = str_split_fixed(plot_name, "_p", 2)[, 1],
+    plant = str_split_fixed(plot_name, "_p", 2)[, 2]
+  )
+
+# paste letter "p" to the plant column
+
+PPD <- PPD %>%
+  mutate(plant = paste0("p", plant)) %>%
+  mutate(
+    Plant = str_split_fixed(plant, "_S", 2)[, 1],
+    slice = str_split_fixed(plot_name, "_S", 2)[, 2]
+  )
+
+# paste letter "S" to the slice column, remove repeat columns and make all colname
+# tolower
+
+PPD <- PPD %>%
+  mutate(slice = paste0("s", slice)) %>%
+  select(-c(plot_name, plant)) %>%
+  rename_all(tolower)
+
+# group by trial_name, plot_name
+
+PPD <- PPD %>%
+  group_by(trial_name, plot_name) %>%
+  summarise(ppd = mean(ppd))
+```
+
+# Join all data frame (data ready for analysis)
+
+```{r}
+
+my_dat <- bind_rows(trials_10mon, trials_12mon) %>%
+  filter(!str_detect(plot_name, "_plant_")) %>%
+  select(!starts_with(c("cook", "DM_raw", "HCN", "yield", "PPD"))) %>%
+  left_join(cooking_time, by = c("trial_name", "plot_name")) %>%
+  left_join(DM, by = c("trial_name", "plot_name")) %>%
+  left_join(HCN, by = c("trial_name", "plot_name")) %>%
+  left_join(yield, by = c("trial_name", "plot_name")) %>%
+  left_join(PPD, by = c("trial_name", "plot_name"))
+```
+
+## QC data
+
+```{r eval=FALSE}
+
+if (FALSE) {
+  my_dat %>%
+    select(height, height_1st_branch) %>%
+    mutate(doHeightlargerheight_branch = ifelse(height > height_1st_branch, "true",
+      ifelse(height < height_1st_branch, "check", "equal")
+    )) %>%
+    distinct(height, height_1st_branch, doHeightlargerheight_branch) %>%
+    filter(doHeightlargerheight_branch %in% c("check", "equal"))
+}
+```
+
+## Save the data raw pivot
+
+```{r}
+master_data[[paste0("raw_data_pivot_", trial_interest)]] <- my_dat
+```
+
+## Traits pivoted
+
+```{r}
+if (trial_interest == "BCGN1") {
+  trait_ideal_pivot <- c(
+    "DM_raw",
+    "DM_gravity",
+    "plant_type",
+    "yield_ha",
+    "branch_number",
+    "height",
+    "height_1st_branch",
+    "root_type1_5",
+    "cook_time",
+    "HCN_linamarase",
+    "betacarotenoid_nirs",
+    "carotenoidtotal_nirs",
+    "ppd"
+  )
+} else {
+  trait_ideal_pivot <- c(
+    "DM_raw",
+    "DM_gravity",
+    "plant_type",
+    "yield_ha",
+    "branch_number",
+    "height",
+    "height_1st_branch",
+    "root_type1_5",
+    "cook_time",
+    "HCN_linamarase",
+    "ppd"
+  )
+}
+```
+
+## Variance boxplot
+
+```{r warning=FALSE}
+
+if (trial_interest == "PDGN1") { # remove all HCN values from 2016 trials (not trusted data)
+  my_dat[str_detect(my_dat$trial_name, "2016|2017|2018|2019"), 18] <- NA
+}
+
+
+fct_labels <- c(
+  DM_raw = "Dry matter by oven (%)",
+  DM_gravity = "Dry matter by gravimetry (%)",
+  plant_type = "Plant type",
+  yield_ha = "Yield (t/ha)",
+  branch_number = "Branching number",
+  height = "Plant height (cm)",
+  height_1st_branch = "1st branch height (cm)",
+  root_type1_5 = "Root type",
+  cook_time = "Cooking time (min)",
+  HCN_linamarase = "Cyanide content (ppm)",
+  ppd = "PPD"
+)
+
+## Grouping boxplot
+
+plot_bxp <- my_dat %>%
+  pivot_longer(
+    cols = trait_ideal_pivot,
+    names_to = "var",
+    values_to = "values"
+  ) %>%
+  filter(!var %in% c(
+    "plant_type", "branch_number",
+    "root_type1_5", "height_1st_branch",
+    "DM_gravity"
+  )) %>%
+  ggplot(aes(x = trial_name, y = values)) +
+  geom_violin(trim = FALSE, fill = "gray") +
+  geom_boxplot(width = 0.2, trim = FALSE) +
+  labs(x = NULL, y = NULL, title = "Wild crossing") +
+  theme_xiaofei() +
+  theme(
+    axis.text.x = element_text(size = 8),
+    axis.text.y = element_text(size = 8),
+    plot.title = element_text(color = "black")
+  ) +
+  facet_wrap(~var,
+    nrow = 5, scales = "free_y",
+    labeller = as_labeller(fct_labels)
+  ) +
+  theme(
+    strip.text.x = element_text(
+      size = 12, face = "bold.italic"
+    )
+  )
+# labs(caption = "Trial name: Year + trial number + pipeline + trial type + location + months after planting")
+plot_bxp
+
+
+  # ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
+  #   plot = plot_bxp, units = "in", dpi = 300, width = 10, height = 7
+  # )
+
+```
+
+## Individual boxplots
+
+```{r warning=FALSE}
+for (i in 1:length(trait_ideal_pivot)) {
+  y_DATA <- my_dat[[trait_ideal_pivot[i]]]
+  x_DATA <- my_dat$trial_name
+  my_DATA <- my_dat
+  y_LABEL <- trait_ideal_pivot[i]
+  x_LABEL <- NULL
+  TITLE <- NULL
+  y_MAX <- max(y_DATA, na.rm = TRUE) * 1.2
+  y_MIN <- 0
+
+  plot_box <- ggplot(my_DATA, aes(x = x_DATA, y = y_DATA)) +
+    geom_violin(trim = FALSE, fill = "gray") +
+    geom_boxplot(width = 0.2) +
+    coord_cartesian(ylim = c(y_MIN, y_MAX)) +
+    theme_xiaofei() +
+    labs(
+      y = y_LABEL, x = x_LABEL,
+      title = TITLE
+    )
+  plot(plot_box)
+  # ggsave(paste0("images/", trait_ideal_pivot[i], "_", trial_interest, Sys.Date(), ".png")  , plot_box, width = 8, height = 4)
+}
+```
+
+# Shared information
+
+```{r}
+
+my_dat <- my_dat %>% mutate(
+  accession_name = as.factor(accession_name),
+  trial_name = as.factor(trial_name)
+)
+i <- 1
+for (var in trait_ideal_pivot) {
+  MM <- my_dat %>%
+    group_by(trial_name, accession_name) %>%
+    summarise(avg = mean(.data[[var]], na.rm = T)) %>%
+    spread(trial_name, avg)
+
+  g1 <-
+    ggCor(MM, returnN = TRUE) +
+    labs(title = "Shared information", subtitle = var) +
+    theme_minimal(base_size = 10) +
+    theme(
+      axis.text.x = element_text(angle = 40, hjust = 1), legend.position = "none",
+      panel.grid.minor.x = element_blank(), panel.grid.major = element_blank()
+    )
+  g1
+  # ggsave(paste0("images/", var, trial_interest, Sys.Date(),".png")  , g1, width = 4, height = 4)
+
+
+  # summary tables
+
+  summ <- my_dat %>%
+    distinct(trial_name, plot_name, rep_number, accession_name, .data[[var]]) %>%
+    group_by(trial_name) %>%
+    summarise(
+      n_gen = n_distinct(accession_name),
+      n_reps = n_distinct(rep_number),
+      n_total = n(),
+      n_missing = sum(is.na(.data[[var]])),
+      n_percent = n_missing / n_total,
+      zeros = sum(.data[[var]] == 0, na.rm = TRUE),
+      rcbd = ifelse(n_reps > 1, TRUE, FALSE),
+      design = ifelse(n_reps == 1, "unrep", design)
+    ) %>%
+    type.convert() %>%
+    arrange(n_gen)
+
+  summ <- summ %>%
+    as.data.frame() %>%
+    mutate(trait = var) %>%
+    print(n = Inf)
+
+  if (i == 1) {
+    resum_tables <- summ
+  } else {
+    resum_tables <- rbind.data.frame(resum_tables, summ)
+  }
+  i <- i + 1
+  master_data[[paste0("summary_", trial_interest)]] <- resum_tables
+}
+```
+
+# MET
+
+```{r}
+h2_fa2 <- c()
+i <- 1
+
+# I've removed "plant_type", "branch_number", "root_type1_5" of wild crossing
+# because not were fitted by the model.
+
+if (trial_interest == "PDGN1") {
+  trait_ideal_pivot <- trait_ideal_pivot[-c(3, 5, 8)]
+}
+
+for (var in trait_ideal_pivot) {
+  trials <- resum_tables %>%
+    filter(trait == var, n_percent < 1) %>%
+    pull(trial_name)
+  eqt_fixed <- reformulate(c("trial_name"), response = var)
+
+  model_MET_2stage <- asreml(
+    fixed = eqt_fixed,
+    random = ~ fa(trial_name, 2):accession_name,
+    data = my_dat %>% filter(trial_name %in% trials) %>% droplevels(),
+    family = asr_gaussian(dispersion = 1),
+    na.action = list(x = "exclude", y = "exclude"),
+    trace = 0
+  )
+
+  model_MET_2stage <- update.asreml(model_MET_2stage)
+  model_MET_2stage <- update.asreml(model_MET_2stage)
+  pred_f <- predict(model_MET_2stage, classify = "accession_name")
+  PP <- pred_f$pvals %>% mutate(variable = var)
+
+  h2_fa2[i] <- agriutilities::heritability_fa(
+    model_fa = model_MET_2stage,
+    genotype = "accession_name",
+    env = "trial_name",
+    vc.model = "fa2"
+  )$H2Cullis
+  names(h2_fa2)[i] <- var
+
+  if (i == 1) {
+    pvals_table <- PP
+  } else {
+    pvals_table <- rbind.data.frame(pvals_table, PP)
+  }
+
+  i <- i + 1
+}
+```
+
+## Model briefly (fill the table for manuscript)
+
+I run a simple model, for extract the variance components to build the table 
+
+```{r}
+# var components
+i <- 1
+for (var in trait_ideal_pivot) {
+  trials <- resum_tables %>%
+    filter(trait == var, n_percent < 1) %>%
+    pull(trial_name)
+  eqt_fixed <- reformulate(c("trial_name"), response = var)
+
+  model_MET_2stage <- asreml(
+    fixed = eqt_fixed,
+    random = ~ accession_name + trial_name:accession_name,
+    data = my_dat %>% filter(trial_name %in% trials) %>% droplevels(),
+    family = asr_gaussian(dispersion = 1),
+    na.action = list(x = "exclude", y = "exclude"),
+    trace = 0
+  )
+
+  model_MET_2stage <- update.asreml(model_MET_2stage)
+  model_MET_2stage <- update.asreml(model_MET_2stage)
+
+
+  var_comp <- summary(model_MET_2stage)$varcomp %>% mutate(variable = var)
+
+  if (i == 1) {
+    varcomp_table <- var_comp
+  } else {
+    varcomp_table <- rbind.data.frame(varcomp_table, var_comp)
+  }
+
+  i <- i + 1
+}
+
+varcomp_table %>% write.table("clipboard", sep = "\t", row.names = T, col.names = T)
+# Not enough degree freedom to calculate the error component
+```
+
+## Summary statistics
+
+```{r}
+multiple.func <- function(x) {
+  c(min = min(x, na.rm = T), mean = mean(x, na.rm = T), max = max(x, na.rm = T), median = median(x, na.rm = T))
+}
+
+sapply(my_dat[trait_ideal_pivot], multiple.func)
+```
+
+
+## Bind and save the heritabilities
+
+```{r}
+if (trial_interest == "BCGN1") {
+  h2_PPD_BC <- 0.599
+  names(h2_PPD_BC) <- "PPD"
+  h2 <- c(h2_fa2, h2_PPD_BC)
+} else {
+  h2_PPD_PD <- 0.90
+  names(h2_PPD_PD) <- "PPD"
+  h2 <- c(h2_fa2, h2_PPD_PD)
+}
+
+h2 <- h2 %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("trait")
+colnames(h2) <- c("var", "h2")
+master_data[[paste0("h2_", trial_interest)]] <- h2
+
+if (trial_interest == "PDGN1") {
+  h2_plot <- h2 %>%
+    filter(!var == "height_1st_branch") %>% # height_1st_branch had low heritability
+    ggplot() +
+    geom_col(aes(x = reorder(var, h2), y = h2)) +
+    theme_xiaofei() +
+    theme(
+      axis.text.x = element_text(size = 9),
+      axis.text.y = element_text(size = 8)
+    ) +
+    labs(x = NULL, y = "Heritability")
+}
+
+# ggsave(paste0("images/heritability", trial_interest, Sys.Date(), ".png"),
+#          plot = h2_plot, units = "in", dpi = 300, width = 10, height = 3)
+```
+
+## Bind and save the BLUPs
+
+```{r}
+blup_table <- pvals_table %>%
+  select(-c(status, std.error)) %>%
+  group_by(variable, accession_name) %>%
+  spread(variable, value = predicted.value) %>%
+  ungroup()
+```
+
+## Load the BLUPs from PPD data
+
+```{r}
+list_file <- list.files(folder)
+
+sel_file <- list_file[str_detect(list_file, "_master_results_") &
+  str_detect(list_file, experiment)]
+
+sel_file[1]
+if (trial_interest == "BCGN1") {
+  blupDF <- read_excel(
+    paste(folder,
+      sel_file[1],
+      sep = ""
+    ),
+    sheet = "BLUP_BLUE_BC"
+  )
+} else {
+  blupDF <- read_excel(
+    paste(folder,
+      sel_file[1],
+      sep = ""
+    ),
+    sheet = "BLUP_BLUE_PD"
+  )
+}
+
+if (trial_interest == "PDGN1") {
+  blup_table %<>% mutate(accession_name = fct_recode(accession_name,
+    "HMC1" = "HMC1P12_is_HMC1",
+    "CM523-7" = "CM523-7_is_Catumare"
+  ))
+}
+
+blupDF_kp <- blupDF %>%
+  select(Genotype, starts_with("BLUP")) %>%
+  rename(
+    "PPD" = BLUPs,
+    "accession_name" = Genotype
+  ) %>%
+  full_join(blup_table, by = c("accession_name" = "accession_name")) %>%
+  arrange(PPD, desc(PPD)) %>%
+  filter(!is.na(PPD))
+
+master_data[[paste0("BLUPs_", trial_interest)]] <- blupDF_kp
+```
+
+## BLUEs or raw data across the trials
+
+```{r}
+
+for (var in trait_ideal_pivot) {
+  # var = "DM_raw"
+  blue_blup <- my_dat %>%
+    select(trial_name, accession_name, .data[[var]]) %>%
+    distinct() %>%
+    group_by(trial_name, accession_name) %>%
+    pivot_wider(names_from = trial_name, values_from = .data[[var]]) %>%
+    right_join(blupDF_kp %>%
+      select(accession_name, matches(var)), by = "accession_name")
+
+  # remove all NA columns
+  blue_blup <- blue_blup[, colSums(is.na(blue_blup)) < nrow(blue_blup)]
+
+  master_data[[paste("BLUP_BLUE_", var, trial_interest, sep = "_")]] <- blue_blup
+}
+```
+
+## PPD BLUEs
+
+```{r}
+var <- "PPD"
+if (trial_interest == "BCGN1") {
+  blupDF <- read_excel(
+    paste(folder,
+      sel_file[1],
+      sep = ""
+    ),
+    sheet = "BLUP_BLUE_BC"
+  )
+  blupDF_PPD <- blupDF %>%
+    rename(
+      "PPD" = BLUPs,
+      "accession_name" = Genotype
+    ) %>%
+    select(!starts_with("se"), -variable)
+} else {
+  blupDF <- read_excel(
+    paste(folder,
+      sel_file[1],
+      sep = ""
+    ),
+    sheet = "BLUP_BLUE_PD"
+  )
+  blupDF_PPD <- blupDF %>%
+    rename(
+      "PPD" = BLUPs,
+      "accession_name" = Genotype
+    ) %>%
+    select(!starts_with("se"), -variable)
+}
+
+master_data[[paste("BLUP_BLUE_", var, trial_interest, sep = "_")]] <- blupDF_PPD
+```
+
+## Save the master file
+
+```{r}
+
+# In some cases there were long names that need to be replace
+# names(master_data)[11] <- "BLUP_BLUE__1st_branch_BCGN1"
+# names(master_data)[9] <- "BLUP_BLUE__1st_branch_PDGN1"
+# names(master_data)[15] <- "BLUP_BLUE__bcaroteno_BCGN1"
+# names(master_data)[16] <- "BLUP_BLUE__caroteno_BCGN1"
+
+meta_file_name <- paste(folder, paste("01_", experiment, "_", trial_interest, "_master_results_",
+  Sys.Date(), "_.xlsx",
+  sep = ""
+),
+sep = ""
+)
+write.xlsx(master_data, file = meta_file_name)
+```
+
+
+## Load the BLUPs data
+
+```{r}
+list_file <- list.files(folder)
+
+sel_file <- list_file[str_detect(list_file, "_master_results_") &
+  str_detect(list_file, trial_interest)]
+
+sel_file[1]
+blupDF_kp <- read_excel(
+  paste(folder,
+    sel_file[1],
+    sep = ""
+  ),
+  sheet = paste0("BLUPs_", trial_interest)
+)
+```
+
+
+# Genetic correlation
+
+```{r}
+library(Hmisc)
+library(ggcorrplot)
+
+par(mfrow = c(1, 1))
+blupDF_value <- blupDF_kp %>%
+  select(-accession_name)
+
+col <- colorRampPalette(c("red", "white", "blue"))(40)
+M <- rcorr(as.matrix(blupDF_value))
+
+
+cor_traits <- ggcorrplot(M$r, hc.order = TRUE, type = "lower", lab = TRUE) +
+  theme_xiaofei() +
+  theme(
+    axis.text.x = element_text(size = 8),
+    axis.text.y = element_text(size = 8),
+    plot.title = element_text(color = "black")
+  ) +
+  labs(x = NULL, y = NULL, title = "Wild crossing population")
+
+# ggsave(paste0("images/cor_traits_", trial_interest, Sys.Date(), ".png"),
+#            plot = cor_traits, units = "in", dpi = 300, width = 8, height = 6)
+```
+
+## Selection index
+
+```{r}
+
+index_col <- c(
+  "PPD", "cook_time", "DM_raw", "HCN_linamarase",
+  "yield_ha"
+)
+
+index_dat <- blupDF_kp %>%
+  select("accession_name", all_of(index_col)) %>%
+  column_to_rownames("accession_name")
+```
+
+## Johan's function
+
+```{r}
+# multi-trait -------------------------------------------------------------
+
+library(explor)
+library(FactoMineR)
+library(factoextra)
+
+pca_index <- function(data, id, variables = NULL, percentage = 0.20, b) {
+  # The data set to be analyzed. It should be in the form of a data frame.
+  data <- as.data.frame(data)
+  rownames(data) <- data[, id]
+
+  if (is.null(variables)) variables <- names(data)[names(data) != id]
+  data <- data[, variables]
+
+  index <- selIndex(Y = as.matrix(data), b = b, scale = T)
+  index <- c(index)
+  data$index <- index
+  data <- data %>% arrange(desc(index))
+  data$selected <- NA
+  data$selected[1:(round(percentage * nrow(data)))] <- TRUE
+  data$selected <- ifelse(is.na(data$selected), FALSE, data$selected)
+
+  res.pca <- PCA(data, graph = T, scale.unit = T, quali.sup = ncol(data))
+
+
+  p1 <- fviz_pca_var(res.pca, col.var = "black", repel = T)
+  p2 <- fviz_pca_ind(res.pca,
+    label = "none", habillage = data$selected,
+    palette = c("#00AFBB", "#FC4E07"), addEllipses = TRUE
+  )
+  # labs(title =  paste("Selection:",
+  #                     paste0(percentage*100,"%")),
+  #      subtitle = paste("Weights:", "(", paste0(b, collapse = ', '),")"  ))
+
+
+  final <- ggarrange(p1, p2, legend = "bottom", common.legend = T)
+  final <- annotate_figure(final,
+    top = text_grob(paste(
+      "Selection:",
+      paste0(percentage * 100, "%"), "\n",
+      paste("Weights:", "(", paste0(b, collapse = ", "), ")", "\n")
+    ), color = "black", face = "bold", size = 14)
+  )
+
+  selection <- data %>% filter(selected == T)
+
+  return(list(res.pca = res.pca, final = final, results = data, selection = selection))
+}
+```
+
+## PCA
+
+```{r}
+
+# CPDCR5B-102, CPDCR5B-055, CPDCR1B-034, B1PD280-040 <- do not have cooking time data
+# I'm going to remove them temporarily, high frogskin presence
+
+# PCA
+pcs <- index_dat %>%
+  dplyr::select_if(is.numeric) %>%
+  drop_na()
+
+pca <- PCA(pcs)
+
+# Interactiva
+explor(pca)
+```
+
+## Eigenvalues
+
+```{r}
+if (trial_interest == "PDGN1") {
+  pop <- "Wild_crossing"
+} else {
+  pop <- "Biofortified_cassava"
+}
+
+# VAR
+var_plot <- fviz_pca_var(pca, col.var = "black", repel = T) +
+  ggtitle(paste0("PCA_", pop)) +
+  theme_xiaofei()
+
+ggsave(paste0("images/PCA_var_", trial_interest, Sys.Date(), ".png"), plot = var_plot, units = "in", dpi = 300, width = 8, height = 8)
+```
+
+## Individuals
+
+```{r}
+# IND
+IND <- fviz_pca_ind(pca, repel = T, alpha.ind = 0.3, col.ind = "grey20", labelsize = 3) +
+  ggtitle(paste0("Individuals - PCA_", pop)) +
+  theme_xiaofei()
+
+ggsave(paste0("images/PCA_ind", trial_interest, Sys.Date(), ".png"), plot = IND, units = "in", dpi = 300, width = 8, height = 8)
+```
+
+## Biplot
+
+```{r}
+BI <- fviz_pca_biplot(pca, repel = T, alpha.ind = 0.8, col.ind = "grey30", labelsize = 3, col.var = "black") +
+  ggtitle(paste0("Biplot - PCA_", pop)) +
+  theme_xiaofei()
+
+ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = BI, units = "in", dpi = 300, width = 12, height = 10)
+```
+
+
+```{r}
+library("cowplot")
+
+test <- ggdraw() +
+  draw_plot(var_plot, x = 0, y = .5, width = .5, height = .5) +
+  draw_plot(IND, x = .5, y = .5, width = .5, height = .5) +
+  draw_plot(BI, x = 0, y = 0, width = .5, height = .5) +
+  draw_plot_label(
+    label = c("A", "B", "C"), size = 15,
+    x = c(0, 0.5, 0), y = c(1, 1, 0.5)
+  )
+
+ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = test, units = "in", dpi = 300, width = 14, height = 12)
+```
+
+
+## Index selection
+
+```{r}
+
+TestIndex_ <- index_dat %>%
+  rownames_to_column("accession_name") %>%
+  drop_na() %>%
+  select(-c(cook_time))
+
+
+res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, 10, -10, 15), percentage = 0.15)
+res.pca_final <- res.pca$final
+res.pca_final
+ggsave("results/selection.png", plot = res.pca_final, units = "in", dpi = 300, width = 12, height = 10)
+
+res.pca$selection
+dim(res.pca$selection)
+
+
+
+pca_index <- function(data, id, variables = NULL, percentage = 0.15, b) {
+  data <- as.data.frame(data)
+  rownames(data) <- data[, id]
+
+  if (is.null(variables)) variables <- names(data)[names(data) != id]
+  data <- data[, variables]
+
+  index <- selIndex(Y = as.matrix(data), b = b, scale = T)
+  index <- c(index)
+  data$index <- index
+  data <- data %>% arrange(desc(index))
+  data$selected <- NA
+  data$selected[1:(round(percentage * nrow(data)))] <- TRUE
+  data$selected <- ifelse(is.na(data$selected), FALSE, data$selected)
+
+  res.pca <- PCA(data, graph = FALSE, scale.unit = T, quali.sup = ncol(data))
+
+
+  p1 <- fviz_pca_var(res.pca, col.var = "black", repel = T)
+  p2 <- fviz_pca_ind(res.pca,
+    label = "none", habillage = data$selected,
+    palette = c("#00AFBB", "#FC4E07"), addEllipses = TRUE
+  )
+  # labs(title =  paste("Selection:",
+  #                     paste0(percentage*100,"%")),
+  #      subtitle = paste("Weights:", "(", paste0(b, collapse = ', '),")"  ))
+
+
+  final <- ggarrange(p1, p2, legend = "bottom", common.legend = T)
+  final <- annotate_figure(final,
+    top = text_grob(paste(
+      "Selection:",
+      paste0(percentage * 100, "%"), "\n",
+      paste("Weights:", "(", paste0(b, collapse = ", "), ")", "\n")
+    ), color = "black", face = "bold", size = 14)
+  )
+
+  selection <- data %>% filter(selected == T)
+
+  return(list(res.pca = res.pca, final = final, results = data, selection = selection))
+}
+```
+
+CPDCR5B-102, CPDCR5B-055, CPDCR1B-034
