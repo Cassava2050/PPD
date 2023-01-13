@@ -62,7 +62,7 @@ It is necessary filter the rows correspond to "plot", because in this way, I'm r
 # Remove genotypes due to non comercials roots
 
 ```{r}
-if (TRUE) {
+if (trial_interest == "PDGN1") {
   dele_geno <- read_excel(paste0(folder, "Materiales a eliminar de ensayo 13-21.xlsx"),
     sheet = "Sheet2"
   )
@@ -730,7 +730,7 @@ my_dat <- my_dat %>% mutate(
   accession_name = as.factor(accession_name),
   trial_name = as.factor(trial_name)
 )
-i <- 1
+
 for (var in trait_ideal_pivot) {
   MM <- my_dat %>%
     group_by(trial_name, accession_name) %>%
@@ -746,9 +746,15 @@ for (var in trait_ideal_pivot) {
       panel.grid.minor.x = element_blank(), panel.grid.major = element_blank()
     )
   g1
-  # ggsave(paste0("images/", var, trial_interest, Sys.Date(),".png")  , g1, width = 4, height = 4)
+  ggsave(paste0("images/", var, trial_interest, Sys.Date(),".png"), g1, units = "in", dpi = 300, width = 7, height = 7)
+}
+```
 
+## Summary tables
 
+```{r}  
+i <- 1
+for (var in trait_ideal_pivot) {
   # summary tables
 
   summ <- my_dat %>%
@@ -788,11 +794,13 @@ for (var in trait_ideal_pivot) {
 h2_fa2 <- c()
 i <- 1
 
-# I've removed "plant_type", "branch_number", "root_type1_5" of wild crossing
+# I've removed "plant_type", "branch_number", "root_type1_5" , "height_1st_branch" wild crossing
 # because not were fitted by the model.
+# DM_gravity was remove because is redundant with DM_oven
+
 
 if (trial_interest == "PDGN1") {
-  trait_ideal_pivot <- trait_ideal_pivot[-c(3, 5, 8)]
+  trait_ideal_pivot <- trait_ideal_pivot[-c(2, 3, 5, 7, 8)]
 }
 
 for (var in trait_ideal_pivot) {
@@ -870,7 +878,7 @@ for (var in trait_ideal_pivot) {
   i <- i + 1
 }
 
-varcomp_table %>% write.table("clipboard", sep = "\t", row.names = T, col.names = T)
+varcomp_table 
 # Not enough degree freedom to calculate the error component
 ```
 
@@ -885,37 +893,17 @@ sapply(my_dat[trait_ideal_pivot], multiple.func)
 ```
 
 
-## Bind and save the heritabilities
+## Save the heritabilities
 
 ```{r}
-if (trial_interest == "BCGN1") {
-  h2_PPD_BC <- 0.599
-  names(h2_PPD_BC) <- "PPD"
-  h2 <- c(h2_fa2, h2_PPD_BC)
-} else {
-  h2_PPD_PD <- 0.90
-  names(h2_PPD_PD) <- "PPD"
-  h2 <- c(h2_fa2, h2_PPD_PD)
-}
 
-h2 <- h2 %>%
+h2 <- h2_fa2 %>%
   as.data.frame() %>%
   tibble::rownames_to_column("trait")
 colnames(h2) <- c("var", "h2")
-master_data[[paste0("h2_", trial_interest)]] <- h2
 
-if (trial_interest == "PDGN1") {
-  h2_plot <- h2 %>%
-    filter(!var == "height_1st_branch") %>% # height_1st_branch had low heritability
-    ggplot() +
-    geom_col(aes(x = reorder(var, h2), y = h2)) +
-    theme_xiaofei() +
-    theme(
-      axis.text.x = element_text(size = 9),
-      axis.text.y = element_text(size = 8)
-    ) +
-    labs(x = NULL, y = "Heritability")
-}
+# save the heritability
+master_data[[paste0("h2_", trial_interest)]] <- h2
 
 # ggsave(paste0("images/heritability", trial_interest, Sys.Date(), ".png"),
 #          plot = h2_plot, units = "in", dpi = 300, width = 10, height = 3)
