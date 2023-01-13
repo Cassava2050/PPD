@@ -916,35 +916,9 @@ blup_table <- pvals_table %>%
   select(-c(status, std.error)) %>%
   group_by(variable, accession_name) %>%
   spread(variable, value = predicted.value) %>%
-  ungroup()
-```
-
-## Load the BLUPs from PPD data
-
-```{r}
-list_file <- list.files(folder)
-
-sel_file <- list_file[str_detect(list_file, "_master_results_") &
-  str_detect(list_file, experiment)]
-
-sel_file[1]
-if (trial_interest == "BCGN1") {
-  blupDF <- read_excel(
-    paste(folder,
-      sel_file[1],
-      sep = ""
-    ),
-    sheet = "BLUP_BLUE_BC"
-  )
-} else {
-  blupDF <- read_excel(
-    paste(folder,
-      sel_file[1],
-      sep = ""
-    ),
-    sheet = "BLUP_BLUE_PD"
-  )
-}
+  ungroup() %>% 
+  arrange(ppd, desc(ppd)) %>%
+  filter(!is.na(ppd))
 
 if (trial_interest == "PDGN1") {
   blup_table %<>% mutate(accession_name = fct_recode(accession_name,
@@ -952,18 +926,8 @@ if (trial_interest == "PDGN1") {
     "CM523-7" = "CM523-7_is_Catumare"
   ))
 }
-
-blupDF_kp <- blupDF %>%
-  select(Genotype, starts_with("BLUP")) %>%
-  rename(
-    "PPD" = BLUPs,
-    "accession_name" = Genotype
-  ) %>%
-  full_join(blup_table, by = c("accession_name" = "accession_name")) %>%
-  arrange(PPD, desc(PPD)) %>%
-  filter(!is.na(PPD))
-
-master_data[[paste0("BLUPs_", trial_interest)]] <- blupDF_kp
+#save the BLUPs data
+master_data[[paste0("BLUPs_", trial_interest)]] <- blup_table
 ```
 
 ## BLUEs or raw data across the trials
@@ -977,7 +941,7 @@ for (var in trait_ideal_pivot) {
     distinct() %>%
     group_by(trial_name, accession_name) %>%
     pivot_wider(names_from = trial_name, values_from = .data[[var]]) %>%
-    right_join(blupDF_kp %>%
+    right_join(blup_table %>%
       select(accession_name, matches(var)), by = "accession_name")
 
   # remove all NA columns
@@ -987,44 +951,7 @@ for (var in trait_ideal_pivot) {
 }
 ```
 
-## PPD BLUEs
-
-```{r}
-var <- "PPD"
-if (trial_interest == "BCGN1") {
-  blupDF <- read_excel(
-    paste(folder,
-      sel_file[1],
-      sep = ""
-    ),
-    sheet = "BLUP_BLUE_BC"
-  )
-  blupDF_PPD <- blupDF %>%
-    rename(
-      "PPD" = BLUPs,
-      "accession_name" = Genotype
-    ) %>%
-    select(!starts_with("se"), -variable)
-} else {
-  blupDF <- read_excel(
-    paste(folder,
-      sel_file[1],
-      sep = ""
-    ),
-    sheet = "BLUP_BLUE_PD"
-  )
-  blupDF_PPD <- blupDF %>%
-    rename(
-      "PPD" = BLUPs,
-      "accession_name" = Genotype
-    ) %>%
-    select(!starts_with("se"), -variable)
-}
-
-master_data[[paste("BLUP_BLUE_", var, trial_interest, sep = "_")]] <- blupDF_PPD
-```
-
-## Save the master file
+## Save the master data
 
 ```{r}
 
@@ -1034,11 +961,9 @@ master_data[[paste("BLUP_BLUE_", var, trial_interest, sep = "_")]] <- blupDF_PPD
 # names(master_data)[15] <- "BLUP_BLUE__bcaroteno_BCGN1"
 # names(master_data)[16] <- "BLUP_BLUE__caroteno_BCGN1"
 
-meta_file_name <- paste(folder, paste("01_", experiment, "_", trial_interest, "_master_results_",
-  Sys.Date(), "_.xlsx",
-  sep = ""
-),
-sep = ""
+meta_file_name <- paste0(folder, paste0(experiment, "_", trial_interest, "_master_results_",
+  Sys.Date(), "_.xlsx"
+)
 )
 write.xlsx(master_data, file = meta_file_name)
 ```
