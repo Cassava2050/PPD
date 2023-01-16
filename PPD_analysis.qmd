@@ -984,40 +984,9 @@ blupDF_kp <- read_excel(
 
 # Genetic correlation
 
-```{r}
-library(Hmisc)
-library(ggcorrplot)
+See the script call it "correlations". Was not possible to export the file using dev.off() function;
+I need to find the way to use that function inside of a Quarto document.
 
-par(mfrow = c(1, 1))
-blupDF_value <- blupDF_kp %>%
-  select(-accession_name)
-
-col <- colorRampPalette(c("red", "white", "blue"))(40)
-M <- rcorr(as.matrix(blupDF_value))
-
-
-cor_traits <- ggcor_cassava(M$r, hc.order = TRUE, type = "lower", lab = TRUE, 
-                         p.mat = M$P, pch = 8, pch.cex = 1) +
-  theme_xiaofei() +
-  theme(
-    axis.text.x = element_text(size = 10),
-    axis.text.y = element_text(size = 10),
-    plot.title = element_text(color = "black"),
-    panel.background = element_rect(fill = "white",
-                                colour = "white",
-                                linewidth = 0.5, linetype = "solid")
-  ) +
-  labs(x = NULL, y = NULL, title = "Wild crossing population")
-
-sjp.corr(blupDF_value, show.legend = TRUE)
-
-cor_traits
-
-# ggsave(paste0("images/cor_traits_", trial_interest, Sys.Date(), ".png"),
-#            plot = cor_traits, units = "in", dpi = 300, width = 8, height = 6)
-
-# ejemplo
-```
 
 ## Selection index
 
@@ -1083,6 +1052,16 @@ pca_index <- function(data, id, variables = NULL, percentage = 0.20, b) {
   selection <- data %>% filter(selected == T)
 
   return(list(res.pca = res.pca, final = final, results = data, selection = selection))
+}
+
+
+
+selIndex <- function (Y, b, scale = FALSE) 
+{
+    if (scale) {
+        return(scale(Y) %*% b)
+    }
+    return(Y %*% b)
 }
 ```
 
