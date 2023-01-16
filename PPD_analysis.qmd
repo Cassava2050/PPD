@@ -980,6 +980,11 @@ blupDF_kp <- read_excel(
   ),
   sheet = paste0("BLUPs_", trial_interest)
 )
+
+blupDF_kp %>% 
+  mutate(across(where(is.numeric), round, 3)) %>% 
+  write.table("clipboard", sep="\t", row.names=F, col.names=TRUE, na = "")
+
 ```
 
 # Genetic correlation
@@ -1166,7 +1171,9 @@ res.pca_final
 ggsave(paste("images/selection",  trial_interest, Sys.Date(), ".png"), plot = res.pca_final, units = "in", dpi = 300, width = 10, height = 10)
 
 res.pca$selection
-res.pca$results
+res.pca$results %>% 
+  mutate(across(where(is.numeric), round, 3)) %>% 
+  write.table("clipboard", sep="\t", row.names=TRUE, col.names=TRUE)
 dim(res.pca$selection)
 
 
