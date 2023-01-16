@@ -993,7 +993,7 @@ I need to find the way to use that function inside of a Quarto document.
 ```{r}
 
 index_col <- c(
-  "PPD", "cook_time", "DM_raw", "HCN_linamarase",
+  "ppd", "cook_time", "DM_raw", "HCN_linamarase",
   "yield_ha"
 )
 
@@ -1010,6 +1010,8 @@ index_dat <- blupDF_kp %>%
 library(explor)
 library(FactoMineR)
 library(factoextra)
+library(cowplot)
+library(ggpubr)
 
 pca_index <- function(data, id, variables = NULL, percentage = 0.20, b) {
   # The data set to be analyzed. It should be in the form of a data frame.
@@ -1030,24 +1032,34 @@ pca_index <- function(data, id, variables = NULL, percentage = 0.20, b) {
   res.pca <- PCA(data, graph = T, scale.unit = T, quali.sup = ncol(data))
 
 
-  p1 <- fviz_pca_var(res.pca, col.var = "black", repel = T)
+  p1 <- fviz_pca_var(res.pca, col.var = "black", repel = T) +
+  theme_xiaofei()
   p2 <- fviz_pca_ind(res.pca,
     label = "none", habillage = data$selected,
-    palette = c("#00AFBB", "#FC4E07"), addEllipses = TRUE
-  )
+    palette = c("#00AFBB", "#FC4E07"), addEllipses = T
+  ) +
+  theme_xiaofei()
   # labs(title =  paste("Selection:",
   #                     paste0(percentage*100,"%")),
   #      subtitle = paste("Weights:", "(", paste0(b, collapse = ', '),")"  ))
 
 
-  final <- ggarrange(p1, p2, legend = "bottom", common.legend = T)
-  final <- annotate_figure(final,
-    top = text_grob(paste(
-      "Selection:",
-      paste0(percentage * 100, "%"), "\n",
-      paste("Weights:", "(", paste0(b, collapse = ", "), ")", "\n")
-    ), color = "black", face = "bold", size = 14)
+  final <- ggdraw() +
+  draw_plot(p1, x = 0, y = 0, width = .5, height = 1) +
+  draw_plot(p2, x = .5, y = 0.2, width = .5, height = 0.6) +
+  draw_plot_label(
+    label = c("A", "B"), size = 15,
+    x = c(0, 0.5), y = c(1, 1)
   )
+  
+  # final <- ggarrange(p1, p2, legend = "bottom", common.legend = T)
+  # final <- annotate_figure(final,
+  #   top = text_grob(paste(
+  #     "Selection:",
+  #     paste0(percentage * 100, "%"), "\n",
+  #     paste("Weights:", "(", paste0(b, collapse = ", "), ")", "\n")
+  #   ), color = "black", face = "bold", size = 14)
+  # )
 
   selection <- data %>% filter(selected == T)
 
@@ -1120,6 +1132,7 @@ BI <- fviz_pca_biplot(pca, repel = T, alpha.ind = 0.8, col.ind = "grey30", label
 
 ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = BI, units = "in", dpi = 300, width = 12, height = 10)
 ```
+## Group the PCA plots above
 
 ```{r}
 library("cowplot")
@@ -1133,6 +1146,7 @@ test <- ggdraw() +
     x = c(0, 0.5, 0), y = c(1, 1, 0.5)
   )
 
+
 ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = test, units = "in", dpi = 300, width = 14, height = 12)
 ```
 
@@ -1142,61 +1156,22 @@ ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = test,
 
 TestIndex_ <- index_dat %>%
   rownames_to_column("accession_name") %>%
-  drop_na() %>%
+  drop_na() #%>%
   select(-c(cook_time))
 
 
-res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, 10, -10, 15), percentage = 0.15)
+res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, -10, 10, -10, 10), percentage = 0.20)
 res.pca_final <- res.pca$final
 res.pca_final
-ggsave("results/selection.png", plot = res.pca_final, units = "in", dpi = 300, width = 12, height = 10)
+ggsave(paste("images/selection",  trial_interest, Sys.Date(), ".png"), plot = res.pca_final, units = "in", dpi = 300, width = 10, height = 10)
 
 res.pca$selection
+res.pca$results
 dim(res.pca$selection)
 
 
 
-pca_index <- function(data, id, variables = NULL, percentage = 0.15, b) {
-  data <- as.data.frame(data)
-  rownames(data) <- data[, id]
 
-  if (is.null(variables)) variables <- names(data)[names(data) != id]
-  data <- data[, variables]
-
-  index <- selIndex(Y = as.matrix(data), b = b, scale = T)
-  index <- c(index)
-  data$index <- index
-  data <- data %>% arrange(desc(index))
-  data$selected <- NA
-  data$selected[1:(round(percentage * nrow(data)))] <- TRUE
-  data$selected <- ifelse(is.na(data$selected), FALSE, data$selected)
-
-  res.pca <- PCA(data, graph = FALSE, scale.unit = T, quali.sup = ncol(data))
-
-
-  p1 <- fviz_pca_var(res.pca, col.var = "black", repel = T)
-  p2 <- fviz_pca_ind(res.pca,
-    label = "none", habillage = data$selected,
-    palette = c("#00AFBB", "#FC4E07"), addEllipses = TRUE
-  )
-  # labs(title =  paste("Selection:",
-  #                     paste0(percentage*100,"%")),
-  #      subtitle = paste("Weights:", "(", paste0(b, collapse = ', '),")"  ))
-
-
-  final <- ggarrange(p1, p2, legend = "bottom", common.legend = T)
-  final <- annotate_figure(final,
-    top = text_grob(paste(
-      "Selection:",
-      paste0(percentage * 100, "%"), "\n",
-      paste("Weights:", "(", paste0(b, collapse = ", "), ")", "\n")
-    ), color = "black", face = "bold", size = 14)
-  )
-
-  selection <- data %>% filter(selected == T)
-
-  return(list(res.pca = res.pca, final = final, results = data, selection = selection))
-}
 ```
 
 CPDCR5B-102, CPDCR5B-055, CPDCR1B-034
