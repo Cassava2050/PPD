@@ -20,8 +20,6 @@ pacman::p_load(tidyverse, fauxnaif, readxl, yarrr, dplyr, knitr, rmarkdown, stat
 source("utilities_tidy.R")
 ```
 
-
-
 ## Load the files to check
 
 ```{r}
@@ -78,7 +76,6 @@ if (trial_interest == "PDGN1") {
     bind_rows(PDGN1201280)
 }
 ```
-
 
 ## change the column class
 
@@ -752,7 +749,7 @@ for (var in trait_ideal_pivot) {
 
 ## Summary tables
 
-```{r}  
+```{r}
 i <- 1
 for (var in trait_ideal_pivot) {
   # summary tables
@@ -843,7 +840,7 @@ for (var in trait_ideal_pivot) {
 
 ## Model briefly (fill the table for manuscript)
 
-I run a simple model, for extract the variance components to build the table 
+I run a simple model, for extract the variance components to build the table
 
 ```{r}
 # var components
@@ -891,7 +888,6 @@ multiple.func <- function(x) {
 
 sapply(my_dat[trait_ideal_pivot], multiple.func)
 ```
-
 
 ## Save the heritabilities
 
@@ -968,7 +964,6 @@ meta_file_name <- paste0(folder, paste0(experiment, "_", trial_interest, "_maste
 write.xlsx(master_data, file = meta_file_name)
 ```
 
-
 ## Load the BLUPs data
 
 ```{r}
@@ -987,7 +982,6 @@ blupDF_kp <- read_excel(
 )
 ```
 
-
 # Genetic correlation
 
 ```{r}
@@ -1002,17 +996,27 @@ col <- colorRampPalette(c("red", "white", "blue"))(40)
 M <- rcorr(as.matrix(blupDF_value))
 
 
-cor_traits <- ggcorrplot(M$r, hc.order = TRUE, type = "lower", lab = TRUE) +
+cor_traits <- ggcor_cassava(M$r, hc.order = TRUE, type = "lower", lab = TRUE, 
+                         p.mat = M$P, pch = 8, pch.cex = 1) +
   theme_xiaofei() +
   theme(
-    axis.text.x = element_text(size = 8),
-    axis.text.y = element_text(size = 8),
-    plot.title = element_text(color = "black")
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(color = "black"),
+    panel.background = element_rect(fill = "white",
+                                colour = "white",
+                                linewidth = 0.5, linetype = "solid")
   ) +
   labs(x = NULL, y = NULL, title = "Wild crossing population")
 
+sjp.corr(blupDF_value, show.legend = TRUE)
+
+cor_traits
+
 # ggsave(paste0("images/cor_traits_", trial_interest, Sys.Date(), ".png"),
 #            plot = cor_traits, units = "in", dpi = 300, width = 8, height = 6)
+
+# ejemplo
 ```
 
 ## Selection index
@@ -1138,7 +1142,6 @@ BI <- fviz_pca_biplot(pca, repel = T, alpha.ind = 0.8, col.ind = "grey30", label
 ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = BI, units = "in", dpi = 300, width = 12, height = 10)
 ```
 
-
 ```{r}
 library("cowplot")
 
@@ -1153,7 +1156,6 @@ test <- ggdraw() +
 
 ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = test, units = "in", dpi = 300, width = 14, height = 12)
 ```
-
 
 ## Index selection
 
