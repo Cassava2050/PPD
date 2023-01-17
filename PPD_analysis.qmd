@@ -28,10 +28,10 @@ local_file <- "yes" # "no"
 
 if (local_file == "yes") {
   folder <- "D:\\OneDrive - CGIAR\\Data Analysis\\PPD\\data_v2\\"
-  file <- "phenotype1.csv" # phenotype.csv <- BCGN1, phenotype1.csv <- PDGN1
+  file <- "phenotype.csv" # phenotype.csv <- BCGN1, phenotype1.csv <- PDGN1
   skip_col <- 0 # double check the number of col skipped
-  # trial_interest = "BCGN1"
-  trial_interest <- "PDGN1" # ---------choose one
+  trial_interest = "BCGN1"
+  #trial_interest <- "PDGN1" # ---------choose one
   year_interest <- 2021
 }
 
@@ -252,8 +252,8 @@ experiment <- "PPD_8_years"
 master_data <- list() # master list
 trial_folder <- folder
 year_interest <- 2021
-# trial_interest = "BCGN1"
-trial_interest <- "PDGN1" #----------------choose one
+trial_interest = "BCGN1"
+# trial_interest <- "PDGN1" #----------------choose one
 ```
 
 ## Load the tidy data for analisys
@@ -417,45 +417,32 @@ trials_12mon <- trial_tidy_all %>%
 ```
 
 ```{r}
-# bind the trials BC population
-if (trial_interest == "BCGN1") { # fix this pivot on BCGN1 population
-  my_dat <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
+# bind the trials 
+
+  beta_carote <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
+    select(trial_name, plot_name, starts_with("beta")) %>% 
     pivot_longer(
       cols = starts_with("beta"),
       names_to = "betacarotenoid_nirs_var",
       values_to = "betacarotenoid_nirs"
     ) %>%
+    select(-ends_with("var")) %>%
+    drop_na() %>%
+    distinct()
+    
+    
+  carote <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
+    select(trial_name, plot_name, starts_with("carote")) %>% 
     pivot_longer(
       cols = starts_with("carote"),
       names_to = "carotenoidtotal_nirs_var",
       values_to = "carotenoidtotal_nirs"
     ) %>%
-    pivot_longer(
-      cols = starts_with("cook"),
-      names_to = "cook_time_var",
-      values_to = "cook_time"
-    ) %>%
-    pivot_longer(
-      cols = starts_with("DM_raw"),
-      names_to = "DM_raw_var",
-      values_to = "DM_raw"
-    ) %>%
-    pivot_longer(
-      cols = starts_with("yield"),
-      names_to = "yield_ha_var",
-      values_to = "yield_ha"
-    ) %>%
-    pivot_longer(
-      cols = starts_with("HCN"),
-      names_to = "HCN_linamarase_var",
-      values_to = "HCN_linamarase"
-    ) %>%
     select(-ends_with("var")) %>%
+    drop_na() %>%
     distinct()
-}
 
 
-if (trial_interest == "PDGN1") {
   cooking_time <- bind_rows(trials_10mon, trials_12mon) %>%
     select(trial_name, plot_name, starts_with("cook")) %>%
     pivot_longer(
