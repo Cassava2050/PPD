@@ -443,7 +443,7 @@ trials_12mon <- trial_tidy_all %>%
     distinct()
 
 
-  cooking_time <- bind_rows(trials_10mon, trials_12mon) %>%
+  cooking_time <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
     select(trial_name, plot_name, starts_with("cook")) %>%
     pivot_longer(
       cols = starts_with("cook"),
@@ -454,7 +454,7 @@ trials_12mon <- trial_tidy_all %>%
     drop_na() %>%
     distinct()
 
-  DM <- bind_rows(trials_10mon, trials_12mon) %>%
+  DM <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
     select(trial_name, plot_name, starts_with("DM_raw")) %>%
     pivot_longer(
       cols = starts_with("DM_raw"),
@@ -465,7 +465,7 @@ trials_12mon <- trial_tidy_all %>%
     drop_na() %>%
     distinct()
 
-  HCN <- bind_rows(trials_10mon, trials_12mon) %>%
+  HCN <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
     select(trial_name, plot_name, starts_with("HCN")) %>%
     pivot_longer(
       cols = starts_with("HCN"),
@@ -476,7 +476,7 @@ trials_12mon <- trial_tidy_all %>%
     drop_na() %>%
     distinct()
 
-  yield <- bind_rows(trials_10mon, trials_12mon) %>%
+  yield <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
     select(trial_name, plot_name, starts_with("yield")) %>%
     pivot_longer(
       cols = starts_with("yield"),
@@ -486,7 +486,7 @@ trials_12mon <- trial_tidy_all %>%
     select(-ends_with("var")) %>%
     drop_na() %>%
     distinct()
-}
+
 ```
 
 ## PPD data treatment
@@ -496,7 +496,7 @@ PPD data need an extra data treatment. The data need to be grouped and summarize
 ```{r}
 
 # pivot the columns start with "PPD" and remove all NAs values.
-PPD <- bind_rows(trials_10mon, trials_12mon) %>%
+PPD <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
   select(trial_name, plot_name, starts_with("PPD")) %>%
   pivot_longer(
     cols = starts_with("PPD"),
@@ -547,9 +547,11 @@ PPD <- PPD %>%
 
 ```{r}
 
-my_dat <- bind_rows(trials_10mon, trials_12mon) %>%
+my_dat <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
   filter(!str_detect(plot_name, "_plant_")) %>%
-  select(!starts_with(c("cook", "DM_raw", "HCN", "yield", "PPD"))) %>%
+  select(!starts_with(c("beta", "carote", "cook", "DM_raw", "HCN", "yield", "PPD"))) %>%
+  left_join(beta_carote, by = c("trial_name", "plot_name")) %>% 
+  left_join(carote, by = c("trial_name", "plot_name")) %>% 
   left_join(cooking_time, by = c("trial_name", "plot_name")) %>%
   left_join(DM, by = c("trial_name", "plot_name")) %>%
   left_join(HCN, by = c("trial_name", "plot_name")) %>%
