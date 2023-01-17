@@ -364,11 +364,14 @@ trait_ideal <- c(
   "betacarotenoid_nirs_11mon",
   "carotenoidtotal_nirs_11mon",
   "PPD_day7_10mon",
-  "PPD_day7_12mon"
+  "PPD_day7_12mon",
+  "PPD_day5_10mon",
+  "PPD_day5_11mon"
 )
 
 trait_wanted <- analysis_trait_v1[analysis_trait_v1 %in%
   trait_ideal]
+
 ```
 
 ## Fixing some errors
@@ -540,7 +543,10 @@ PPD <- PPD %>%
 
 PPD <- PPD %>%
   group_by(trial_name, plot_name) %>%
-  summarise(ppd = mean(ppd))
+  summarise(ppd = mean(ppd)) %>% 
+  ungroup()
+
+PPD %>% distinct(trial_name)
 ```
 
 # Join all data frame (data ready for analysis)
@@ -645,22 +651,21 @@ plot_bxp <- my_dat %>%
     values_to = "values"
   ) %>%
   filter(!var %in% c(
-    "plant_type", "branch_number",
-    "root_type1_5", "height_1st_branch",
     "DM_gravity"
   )) %>%
   ggplot(aes(x = trial_name, y = values)) +
   geom_violin(trim = FALSE, fill = "gray") +
   geom_boxplot(width = 0.2, trim = FALSE) +
-  labs(x = NULL, y = NULL, title = "Wild crossing") +
+  labs(x = NULL, y = NULL, title = "Biofortified cassava") +
   theme_xiaofei() +
   theme(
-    axis.text.x = element_text(size = 8),
+    axis.text.x = element_text(size = 7, vjust = 1),
     axis.text.y = element_text(size = 8),
-    plot.title = element_text(color = "black")
+    plot.title = element_text(color = "black"),
+    
   ) +
   facet_wrap(~var,
-    nrow = 5, scales = "free_y",
+    ncol = 2, scales = "free_y",
     labeller = as_labeller(fct_labels)
   ) +
   theme(
@@ -672,9 +677,9 @@ plot_bxp <- my_dat %>%
 plot_bxp
 
 
-  # ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
-  #   plot = plot_bxp, units = "in", dpi = 300, width = 10, height = 7
-  # )
+  ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
+    plot = plot_bxp, units = "in", dpi = 300, width = 12, height = 9
+  )
 
 ```
 
