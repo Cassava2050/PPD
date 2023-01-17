@@ -620,11 +620,6 @@ if (trial_interest == "BCGN1") {
 
 ```{r warning=FALSE}
 
-if (trial_interest == "PDGN1") { # remove all HCN values from 2016 trials (not trusted data)
-  my_dat[str_detect(my_dat$trial_name, "2016|2017|2018|2019"), 18] <- NA
-}
-
-
 fct_labels <- c(
   DM_raw = "Dry matter by oven (%)",
   DM_gravity = "Dry matter by gravimetry (%)",
@@ -636,6 +631,8 @@ fct_labels <- c(
   root_type1_5 = "Root type",
   cook_time = "Cooking time (min)",
   HCN_linamarase = "Cyanide content (ppm)",
+  betacarotenoid_nirs = "B-carotene by NIR (ug/g)",
+  carotenoidtotal_nirs = "Total carotenoids by NIR (ug/g)",
   ppd = "PPD"
 )
 
@@ -643,7 +640,7 @@ fct_labels <- c(
 
 plot_bxp <- my_dat %>%
   pivot_longer(
-    cols = trait_ideal_pivot,
+    cols = all_of(trait_ideal_pivot),
     names_to = "var",
     values_to = "values"
   ) %>%
