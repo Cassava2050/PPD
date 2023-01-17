@@ -61,3 +61,11 @@ corrplot(M, p.mat=testRes$p,
 
 dev.off()
 
+
+
+# correlation among dry matters ------------------------------------------
+
+traits <- readRDS(file = here::here("data_v2", "tidy_PDGN12023-01-17.rds"))
+
+
+cor(traits$DM_gravity, traits$DM_raw, use = "complete.obs")
