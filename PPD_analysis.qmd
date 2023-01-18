@@ -644,6 +644,10 @@ fct_labels <- c(
 
 ## Grouping boxplot
 
+# remove columns with all NA
+my_dat_noNA <- trial_tidy[, colSums(is.na(trial_tidy)) < nrow(trial_tidy)]
+trait_wanted <- names(my_dat_noNA)[names(my_dat_noNA) %in% trait_list]
+
 plot_bxp <- my_dat %>%
   pivot_longer(
     cols = all_of(trait_ideal_pivot),
@@ -701,12 +705,16 @@ for (i in 1:length(trait_ideal_pivot)) {
     geom_boxplot(width = 0.2) +
     coord_cartesian(ylim = c(y_MIN, y_MAX)) +
     theme_xiaofei() +
+    theme(
+    axis.text.x = element_text(size = 7, vjust = 1),
+    axis.text.y = element_text(size = 8),
+    plot.title = element_text(color = "black")) +
     labs(
       y = y_LABEL, x = x_LABEL,
       title = TITLE
     )
   plot(plot_box)
-  # ggsave(paste0("images/", trait_ideal_pivot[i], "_", trial_interest, Sys.Date(), ".png")  , plot_box, width = 8, height = 4)
+  ggsave(paste0("images/", trait_ideal_pivot[i], "_", trial_interest, Sys.Date(), ".png")  , plot_box, width = 8, height = 4)
 }
 ```
 
@@ -782,16 +790,11 @@ for (var in trait_ideal_pivot) {
 h2_fa2 <- c()
 i <- 1
 
-# I've removed "plant_type", "branch_number", "root_type1_5" , "height_1st_branch" wild crossing
-# because not were fitted by the model.
+# I've removed 
 # DM_gravity was remove because is redundant with DM_oven
+# "DM_gravity"    "plant_type"    "branch_number" "root_type1_5" fitted in the model
 
-
-if (trial_interest == "PDGN1") {
-  trait_ideal_pivot <- trait_ideal_pivot[-c(2, 3, 5, 7, 8)]
-}
-
-for (var in trait_ideal_pivot) {
+for (var in trait_ideal_pivot[c(2, 3, 5, 8)]) {
   trials <- resum_tables %>%
     filter(trait == var, n_percent < 1) %>%
     pull(trial_name)
@@ -827,6 +830,8 @@ for (var in trait_ideal_pivot) {
 
   i <- i + 1
 }
+
+pvals_table$variable %>% unique()
 ```
 
 ## Model briefly (fill the table for manuscript)
