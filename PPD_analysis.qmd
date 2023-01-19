@@ -794,7 +794,7 @@ i <- 1
 # DM_gravity was remove because is redundant with DM_oven
 # "DM_gravity"    "plant_type"    "branch_number" "root_type1_5" fitted in the model
 
-for (var in trait_ideal_pivot[c(2, 3, 5, 8)]) {
+for (var in trait_ideal_pivot[-c(2, 3, 5, 8)]) {
   trials <- resum_tables %>%
     filter(trait == var, n_percent < 1) %>%
     pull(trial_name)
@@ -841,7 +841,7 @@ I run a simple model, for extract the variance components to build the table
 ```{r}
 # var components
 i <- 1
-for (var in trait_ideal_pivot) {
+for (var in trait_ideal_pivot[-c(2, 3, 5, 8)]) {
   trials <- resum_tables %>%
     filter(trait == var, n_percent < 1) %>%
     pull(trial_name)
@@ -882,7 +882,7 @@ multiple.func <- function(x) {
   c(min = min(x, na.rm = T), mean = mean(x, na.rm = T), max = max(x, na.rm = T), median = median(x, na.rm = T))
 }
 
-sapply(my_dat[trait_ideal_pivot], multiple.func)
+sapply(my_dat[trait_ideal_pivot[-c(2, 3, 5, 8)]], multiple.func)
 ```
 
 ## Save the heritabilities
@@ -896,9 +896,6 @@ colnames(h2) <- c("var", "h2")
 
 # save the heritability
 master_data[[paste0("h2_", trial_interest)]] <- h2
-
-# ggsave(paste0("images/heritability", trial_interest, Sys.Date(), ".png"),
-#          plot = h2_plot, units = "in", dpi = 300, width = 10, height = 3)
 ```
 
 ## Bind and save the BLUPs
@@ -912,12 +909,6 @@ blup_table <- pvals_table %>%
   arrange(ppd, desc(ppd)) %>%
   filter(!is.na(ppd))
 
-if (trial_interest == "PDGN1") {
-  blup_table %<>% mutate(accession_name = fct_recode(accession_name,
-    "HMC1" = "HMC1P12_is_HMC1",
-    "CM523-7" = "CM523-7_is_Catumare"
-  ))
-}
 #save the BLUPs data
 master_data[[paste0("BLUPs_", trial_interest)]] <- blup_table
 ```
@@ -926,7 +917,7 @@ master_data[[paste0("BLUPs_", trial_interest)]] <- blup_table
 
 ```{r}
 
-for (var in trait_ideal_pivot) {
+for (var in trait_ideal_pivot[-c(2, 3, 5, 8)]) {
   # var = "DM_raw"
   blue_blup <- my_dat %>%
     select(trial_name, accession_name, .data[[var]]) %>%
@@ -934,13 +925,15 @@ for (var in trait_ideal_pivot) {
     group_by(trial_name, accession_name) %>%
     pivot_wider(names_from = trial_name, values_from = .data[[var]]) %>%
     right_join(blup_table %>%
-      select(accession_name, matches(var)), by = "accession_name")
+    select(accession_name, matches(var)), by = "accession_name")
 
   # remove all NA columns
   blue_blup <- blue_blup[, colSums(is.na(blue_blup)) < nrow(blue_blup)]
 
   master_data[[paste("BLUP_BLUE_", var, trial_interest, sep = "_")]] <- blue_blup
 }
+
+master_data$
 ```
 
 ## Save the master data
