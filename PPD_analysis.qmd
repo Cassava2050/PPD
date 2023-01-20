@@ -49,34 +49,6 @@ sel_data <- read_cassavabase(phenotypeFile = paste0(folder, file))
 sel_data_kp <- change_colname(sel_data, NA)
 ```
 
-## Filter observationLevel == "plot"
-
-It is necessary filter the rows correspond to "plot", because in this way, I'm removing the PPD evaluations and I'm keeping the rest.
-
-```{r}
-# sel_data_kp %<>% filter(observationLevel == "plot")
-```
-
-# Remove genotypes due to non comercials roots
-
-```{r}
-if (trial_interest == "PDGN1") {
-  dele_geno <- read_excel(paste0(folder, "Materiales a eliminar de ensayo 13-21.xlsx"),
-    sheet = "Sheet2"
-  )
-
-  # select 13_21 trial for selection size root
-  PDGN1201280 <- sel_data_kp %>% filter(str_detect(use_trial_name, "201280PDGN1_ciat"))
-
-  PDGN1201280 <- PDGN1201280 %>% filter(!use_accession_name %in% dele_geno$Genotype)
-
-
-  sel_data_kp <- sel_data_kp %>%
-    filter(!str_detect(use_trial_name, "201280PDGN1_ciat")) %>%
-    bind_rows(PDGN1201280)
-}
-```
-
 ## change the column class
 
 ```{r}
@@ -319,7 +291,7 @@ meta_all_adj <- c(
 )
 ```
 
-## Select the meta information and observations for analysis
+## Select the observations for analysis
 
 ```{r}
 names(trial_tidy_all) <- gsub("-", "_", names(trial_tidy_all))
@@ -327,12 +299,18 @@ analysis_trait_v1 <- names(trial_tidy_all)[names(trial_tidy_all) %in% trait_all_
 
 print("All the traits investigated:")
 print(analysis_trait_v1)
+```
 
+
+## Select the meta information for analysis
+
+```{r}
 meta_col <- names(trial_tidy_all)[names(trial_tidy_all) %in% meta_all_adj]
 
 print("All the meta information:")
 print(meta_col)
 ```
+
 
 ## Trait ideal
 
@@ -404,19 +382,40 @@ vars_12mon <- trial_tidy_all %>%
   select(matches("12mon")) %>%
   colnames()
 
+
 trials_10mon <- trial_tidy_all %>%
   select(year, trial_name, plot_name, accession_name, rep_number, all_of(vars_10mon)) %>%
-  dplyr::mutate(trial_name = paste0(trial_name, "_10"))
+  dplyr::mutate(trial_name = paste0(trial_name, "_10")) %>%
+  filter(
+    !if_all(
+      .cols = vars_10mon,
+      .fns = ~ is.na(.x)
+    )
+  )
 
-if (trial_interest == "BCGN1") {
-  trials_11mon <- trial_tidy_all %>%
+
+trials_11mon <- trial_tidy_all %>%
     select(year, trial_name, plot_name, accession_name, rep_number, all_of(vars_11mon)) %>%
-    dplyr::mutate(trial_name = paste0(trial_name, "_11"))
-}
+    dplyr::mutate(trial_name = paste0(trial_name, "_11")) %>% 
+    filter(
+    !if_all(
+      .cols = vars_11mon,
+      .fns = ~ is.na(.x)
+    )
+  ) 
+                 
 
 trials_12mon <- trial_tidy_all %>%
   select(year, trial_name, plot_name, accession_name, rep_number, all_of(vars_12mon)) %>%
-  dplyr::mutate(trial_name = paste0(trial_name, "_12"))
+  dplyr::mutate(trial_name = paste0(trial_name, "_12")) %>% 
+  filter(
+    !if_all(
+      .cols = vars_12mon,
+      .fns = ~ is.na(.x)
+    )
+  ) 
+
+
 ```
 
 ```{r}
@@ -507,6 +506,7 @@ PPD <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
     values_to = "PPD"
   ) %>%
   select(-ends_with("var")) %>%
+  filter(str_detect(plot_name, "_plant_")) %>%
   drop_na() %>%
   distinct()
 
@@ -545,8 +545,6 @@ PPD <- PPD %>%
   group_by(trial_name, plot_name) %>%
   summarise(ppd = mean(ppd)) %>% 
   ungroup()
-
-PPD %>% distinct(trial_name)
 ```
 
 # Join all data frame (data ready for analysis)
@@ -563,6 +561,8 @@ my_dat <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
   left_join(HCN, by = c("trial_name", "plot_name")) %>%
   left_join(yield, by = c("trial_name", "plot_name")) %>%
   left_join(PPD, by = c("trial_name", "plot_name"))
+
+
 ```
 
 ## QC data
@@ -589,7 +589,6 @@ master_data[[paste0("raw_data_pivot_", trial_interest)]] <- my_dat
 ## Traits pivoted
 
 ```{r}
-if (trial_interest == "BCGN1") {
   trait_ideal_pivot <- c(
     "DM_raw",
     "DM_gravity",
@@ -605,21 +604,6 @@ if (trial_interest == "BCGN1") {
     "carotenoidtotal_nirs",
     "ppd"
   )
-} else {
-  trait_ideal_pivot <- c(
-    "DM_raw",
-    "DM_gravity",
-    "plant_type",
-    "yield_ha",
-    "branch_number",
-    "height",
-    "height_1st_branch",
-    "root_type1_5",
-    "cook_time",
-    "HCN_linamarase",
-    "ppd"
-  )
-}
 ```
 
 ## Variance boxplot
@@ -644,9 +628,6 @@ fct_labels <- c(
 
 ## Grouping boxplot
 
-# remove columns with all NA
-my_dat_noNA <- trial_tidy[, colSums(is.na(trial_tidy)) < nrow(trial_tidy)]
-trait_wanted <- names(my_dat_noNA)[names(my_dat_noNA) %in% trait_list]
 
 plot_bxp <- my_dat %>%
   pivot_longer(
@@ -655,7 +636,10 @@ plot_bxp <- my_dat %>%
     values_to = "values"
   ) %>%
   filter(!var %in% c(
-    "DM_gravity"
+    "DM_gravity", 
+    "plant_type",
+    "branch_number",
+    "root_type1_5"
   )) %>%
   ggplot(aes(x = trial_name, y = values)) +
   geom_violin(trim = FALSE, fill = "gray") +
@@ -663,13 +647,13 @@ plot_bxp <- my_dat %>%
   labs(x = NULL, y = NULL, title = "Biofortified cassava") +
   theme_xiaofei() +
   theme(
-    axis.text.x = element_text(size = 7, vjust = 1),
+    axis.text.x = element_text(size = 8, vjust = 1),
     axis.text.y = element_text(size = 8),
     plot.title = element_text(color = "black"),
     
   ) +
   facet_wrap(~var,
-    ncol = 2, scales = "free_y",
+    ncol = 3, scales = "free_y",
     labeller = as_labeller(fct_labels)
   ) +
   theme(
@@ -681,7 +665,7 @@ plot_bxp <- my_dat %>%
 plot_bxp
 
 
-  ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
+ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
     plot = plot_bxp, units = "in", dpi = 300, width = 12, height = 9
   )
 
@@ -706,7 +690,7 @@ for (i in 1:length(trait_ideal_pivot)) {
     coord_cartesian(ylim = c(y_MIN, y_MAX)) +
     theme_xiaofei() +
     theme(
-    axis.text.x = element_text(size = 7, vjust = 1),
+    axis.text.x = element_text(size = 8, vjust = 1),
     axis.text.y = element_text(size = 8),
     plot.title = element_text(color = "black")) +
     labs(
@@ -787,14 +771,19 @@ for (var in trait_ideal_pivot) {
 # MET
 
 ```{r}
+
+my_dat <- my_dat %>% mutate(trial_name = as.factor(trial_name), 
+                            accession_name = as.factor(accession_name))
 h2_fa2 <- c()
 i <- 1
 
 # I've removed 
 # DM_gravity was remove because is redundant with DM_oven
-# "DM_gravity"    "plant_type"    "branch_number" "root_type1_5" fitted in the model
+# "plant_type"    "branch_number" "root_type1_5" fitted in the model
 
-for (var in trait_ideal_pivot[-c(2, 3, 5, 8)]) {
+trait_ideal_pivot <- trait_ideal_pivot[-c(2, 3, 5, 8)]
+
+for (var in trait_ideal_pivot) {
   trials <- resum_tables %>%
     filter(trait == var, n_percent < 1) %>%
     pull(trial_name)
@@ -830,8 +819,6 @@ for (var in trait_ideal_pivot[-c(2, 3, 5, 8)]) {
 
   i <- i + 1
 }
-
-pvals_table$variable %>% unique()
 ```
 
 ## Model briefly (fill the table for manuscript)
@@ -841,7 +828,7 @@ I run a simple model, for extract the variance components to build the table
 ```{r}
 # var components
 i <- 1
-for (var in trait_ideal_pivot[-c(2, 3, 5, 8)]) {
+for (var in trait_ideal_pivot) {
   trials <- resum_tables %>%
     filter(trait == var, n_percent < 1) %>%
     pull(trial_name)
@@ -882,7 +869,7 @@ multiple.func <- function(x) {
   c(min = min(x, na.rm = T), mean = mean(x, na.rm = T), max = max(x, na.rm = T), median = median(x, na.rm = T))
 }
 
-sapply(my_dat[trait_ideal_pivot[-c(2, 3, 5, 8)]], multiple.func)
+sapply(my_dat[trait_ideal_pivot], multiple.func)
 ```
 
 ## Save the heritabilities
@@ -916,13 +903,29 @@ master_data[[paste0("BLUPs_", trial_interest)]] <- blup_table
 ## BLUEs or raw data across the trials
 
 ```{r}
+# I remove those plots, because they had the genotype replicated and did not have 
+# ppd data
 
-for (var in trait_ideal_pivot[-c(2, 3, 5, 8)]) {
+my_dat <- my_dat %>% 
+  filter(!(trial_name == "201680BCGN1_ciat_10" &
+           plot_name == "201680BCGN1_ciat_rep1_GM905-60_42"),
+         !(trial_name == "201728BCGN1_ciat_10" & 
+             plot_name == "201728BCGN1_ciat_rep1_GM905-52_109"),
+         !(trial_name == "201728BCGN1_ciat_10" & 
+             plot_name == "201728BCGN1_ciat_rep1_GM905-60_110"),
+         !(trial_name == "201728BCGN1_ciat_10" & 
+             plot_name == "201728BCGN1_ciat_rep1_GM905-60_34"),
+         !(trial_name == "201680BCGN1_ciat_12" & 
+             plot_name == "201680BCGN1_ciat_rep1_GM905-60_13")) 
+  
+
+
+for (var in trait_ideal_pivot) {
   # var = "DM_raw"
-  blue_blup <- my_dat %>%
+  blue_blup <- my_dat %>% 
     select(trial_name, accession_name, .data[[var]]) %>%
     distinct() %>%
-    group_by(trial_name, accession_name) %>%
+    group_by(trial_name, accession_name) %>% 
     pivot_wider(names_from = trial_name, values_from = .data[[var]]) %>%
     right_join(blup_table %>%
     select(accession_name, matches(var)), by = "accession_name")
@@ -933,7 +936,6 @@ for (var in trait_ideal_pivot[-c(2, 3, 5, 8)]) {
   master_data[[paste("BLUP_BLUE_", var, trial_interest, sep = "_")]] <- blue_blup
 }
 
-master_data$
 ```
 
 ## Save the master data
@@ -941,10 +943,9 @@ master_data$
 ```{r}
 
 # In some cases there were long names that need to be replace
-# names(master_data)[11] <- "BLUP_BLUE__1st_branch_BCGN1"
-# names(master_data)[9] <- "BLUP_BLUE__1st_branch_PDGN1"
-# names(master_data)[15] <- "BLUP_BLUE__bcaroteno_BCGN1"
-# names(master_data)[16] <- "BLUP_BLUE__caroteno_BCGN1"
+names(master_data)[8] <- "BLUP_BLUE__1st_branch_BCGN1"
+names(master_data)[11] <- "BLUP_BLUE__bcaroteno_BCGN1"
+names(master_data)[12] <- "BLUP_BLUE__caroteno_BCGN1"
 
 meta_file_name <- paste0(folder, paste0(experiment, "_", trial_interest, "_master_results_",
   Sys.Date(), "_.xlsx"
@@ -987,8 +988,8 @@ I need to find the way to use that function inside of a Quarto document.
 ```{r}
 
 index_col <- c(
-  "ppd", "cook_time", "DM_raw", "HCN_linamarase",
-  "yield_ha"
+  "ppd", "carotenoidtotal_nirs", "DM_raw", "HCN_linamarase",
+  "yield_ha", "height", "height_1st_branch"
 )
 
 index_dat <- blupDF_kp %>%
@@ -1150,11 +1151,11 @@ ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = test,
 
 TestIndex_ <- index_dat %>%
   rownames_to_column("accession_name") %>%
-  drop_na() #%>%
-  select(-c(cook_time))
+  drop_na() %>%
+  select(-c(height, height_1st_branch))
 
 
-res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, -10, 10, -10, 10), percentage = 0.20)
+res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, 10, 10, -10, 10), percentage = 0.20)
 res.pca_final <- res.pca$final
 res.pca_final
 ggsave(paste("images/selection",  trial_interest, Sys.Date(), ".png"), plot = res.pca_final, units = "in", dpi = 300, width = 10, height = 10)
