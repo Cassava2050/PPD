@@ -49,14 +49,6 @@ sel_data <- read_cassavabase(phenotypeFile = paste0(folder, file))
 sel_data_kp <- change_colname(sel_data, NA)
 ```
 
-## Filter observationLevel == "plot"
-
-It is necessary filter the rows correspond to "plot", because in this way, I'm removing the PPD evaluations and I'm keeping the rest.
-
-```{r}
-# sel_data_kp %<>% filter(observationLevel == "plot")
-```
-
 # Remove genotypes due to non comercials roots
 
 ```{r}
@@ -371,17 +363,6 @@ trait_wanted <- analysis_trait_v1[analysis_trait_v1 %in%
   trait_ideal]
 ```
 
-## Fixing some errors
-
-```{r}
-if (trial_interest == "BCGN1") {
-  trial_tidy_all <- trial_tidy_all %>%
-    mutate(
-      HCN_linamarase_10mon =
-        ifelse(trial_name == "201681BCGN1_ciat" | plot_name == "201681BCGN1_ciat_rep1_GM3732-13_15", NA, HCN_linamarase_10mon)
-    )
-}
-```
 
 ## Reshape the data
 
@@ -391,11 +372,6 @@ vars_10mon <- trial_tidy_all %>%
   select(matches("10mon"), !contains("mon")) %>%
   colnames()
 
-vars_11mon <- trial_tidy_all %>%
-  select(all_of(trait_wanted)) %>%
-  select(matches("11mon")) %>%
-  colnames()
-
 vars_12mon <- trial_tidy_all %>%
   select(all_of(trait_wanted)) %>%
   select(matches("12mon")) %>%
@@ -403,58 +379,27 @@ vars_12mon <- trial_tidy_all %>%
 
 trials_10mon <- trial_tidy_all %>%
   select(year, trial_name, plot_name, accession_name, rep_number, all_of(vars_10mon)) %>%
-  dplyr::mutate(trial_name = paste0(trial_name, "_10"))
+  dplyr::mutate(trial_name = paste0(trial_name, "_10")) %>%
+  filter( # Remove rows with filled NAs in vars_10mon
+    !if_all(
+      .cols = vars_10mon,
+      .fns = ~ is.na(.x)
+    )
+  )
 
-if (trial_interest == "BCGN1") {
-  trials_11mon <- trial_tidy_all %>%
-    select(year, trial_name, plot_name, accession_name, rep_number, all_of(vars_11mon)) %>%
-    dplyr::mutate(trial_name = paste0(trial_name, "_11"))
-}
 
 trials_12mon <- trial_tidy_all %>%
   select(year, trial_name, plot_name, accession_name, rep_number, all_of(vars_12mon)) %>%
-  dplyr::mutate(trial_name = paste0(trial_name, "_12"))
+  dplyr::mutate(trial_name = paste0(trial_name, "_12")) %>% 
+  filter(
+    !if_all(
+      .cols = vars_12mon,
+      .fns = ~ is.na(.x)
+    )
+  )
 ```
 
 ```{r}
-# bind the trials BC population
-if (trial_interest == "BCGN1") { # fix this pivot on BCGN1 population
-  my_dat <- bind_rows(trials_10mon, trials_11mon, trials_12mon) %>%
-    pivot_longer(
-      cols = starts_with("beta"),
-      names_to = "betacarotenoid_nirs_var",
-      values_to = "betacarotenoid_nirs"
-    ) %>%
-    pivot_longer(
-      cols = starts_with("carote"),
-      names_to = "carotenoidtotal_nirs_var",
-      values_to = "carotenoidtotal_nirs"
-    ) %>%
-    pivot_longer(
-      cols = starts_with("cook"),
-      names_to = "cook_time_var",
-      values_to = "cook_time"
-    ) %>%
-    pivot_longer(
-      cols = starts_with("DM_raw"),
-      names_to = "DM_raw_var",
-      values_to = "DM_raw"
-    ) %>%
-    pivot_longer(
-      cols = starts_with("yield"),
-      names_to = "yield_ha_var",
-      values_to = "yield_ha"
-    ) %>%
-    pivot_longer(
-      cols = starts_with("HCN"),
-      names_to = "HCN_linamarase_var",
-      values_to = "HCN_linamarase"
-    ) %>%
-    select(-ends_with("var")) %>%
-    distinct()
-}
-
-
 if (trial_interest == "PDGN1") {
   cooking_time <- bind_rows(trials_10mon, trials_12mon) %>%
     select(trial_name, plot_name, starts_with("cook")) %>%
@@ -686,9 +631,9 @@ plot_bxp <- my_dat %>%
 plot_bxp
 
 
-  # ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
-  #   plot = plot_bxp, units = "in", dpi = 300, width = 10, height = 7
-  # )
+  ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
+    plot = plot_bxp, units = "in", dpi = 300, width = 10, height = 7
+  )
 
 ```
 
