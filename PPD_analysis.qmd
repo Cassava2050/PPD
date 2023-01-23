@@ -858,7 +858,7 @@ for (var in trait_ideal_pivot) {
   i <- i + 1
 }
 
-varcomp_table 
+format(varcomp_table, scientific  = F) # non exponent notation
 # Not enough degree freedom to calculate the error component
 ```
 
@@ -989,7 +989,7 @@ I need to find the way to use that function inside of a Quarto document.
 
 index_col <- c(
   "ppd", "carotenoidtotal_nirs", "DM_raw", "HCN_linamarase",
-  "yield_ha", "height", "height_1st_branch"
+  "yield_ha", "height_1st_branch"
 )
 
 index_dat <- blupDF_kp %>%
@@ -1084,6 +1084,18 @@ pcs <- index_dat %>%
   dplyr::select_if(is.numeric) %>%
   drop_na()
 
+# Change colnames ---------------------------------------------------------
+
+colnames(pcs) <- c(
+  "PPD", 
+  "Total carotenoids by NIR (ug/g)",
+  "Dry matter by oven (%)",
+  "Cyanide content (ppm)", 
+  "Yield (t/ha)", 
+  "1st branch height (cm)"
+)
+
+
 pca <- PCA(pcs)
 
 # Interactiva
@@ -1151,11 +1163,9 @@ ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = test,
 
 TestIndex_ <- index_dat %>%
   rownames_to_column("accession_name") %>%
-  drop_na() %>%
-  select(-c(height, height_1st_branch))
+  drop_na() 
 
-
-res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, 10, 10, -10, 10), percentage = 0.20)
+res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, 10, 10, -10, 10, 10), percentage = 0.20)
 res.pca_final <- res.pca$final
 res.pca_final
 ggsave(paste("images/selection",  trial_interest, Sys.Date(), ".png"), plot = res.pca_final, units = "in", dpi = 300, width = 10, height = 10)
