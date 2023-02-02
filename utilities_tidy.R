@@ -168,21 +168,28 @@ plot_number_dup = function (sel_data_kp = sel_data_kp) {
 
 #### function visualize the layout -
 
-trial_layout = function(trial = sel_data_kp){
-  trial_list = unique(trial$use_trial_name)
-  for (i in 1:length(trial_list)){
-    trial_i = trial %>%
+trial_layout <- function(trial = sel_data_kp) {
+  trial_list <- unique(trial$use_trial_name)
+  for (i in 1:length(trial_list)) {
+    trial_i <- trial %>%
       filter(use_trial_name %in% trial_list[i])
-    myplot <- ggplot(trial_i, aes(x = factor(use_col_number), y = factor(use_row_number), fill=factor(use_rep_number))) +
-      geom_tile(color="black", size=0.5) +           # Black border on tiles
-      labs(x="col_number", y="row_number", fill = "rep",title = trial_list[i]) +
-      coord_fixed() +                                # Square tiles
-      theme_xiaofei() +
-      geom_point(
-      data = datos %>% filter(!is.na(is_a_control)),
-      aes(size = is_a_control), alpha = 0.5
-     )
+    myplot <- ggplot(trial_i, aes(x = factor(use_col_number), y = factor(use_row_number), fill = factor(use_rep_number))) +
+      geom_tile(color = "black", size = 0.5) + # Black border on tiles
+      labs(x = "col_number", y = "row_number", fill = "rep", title = trial_list[i]) +
+      coord_fixed() + # Square tiles
+      theme_minimal() + # Minimal theme, no grey background
+      geom_tile(
+        data = trial_i %>% filter(use_check_test == "check"),
+        aes(fill = use_check_test), col = "black"
+      ) +
+      theme(
+        panel.grid = element_blank(), # No underlying grid lines
+        axis.text.x = element_text( # Vertical text on x axis
+          angle = 0, vjust = 0.5, hjust = 0
+        )
+      )
     print(myplot)
+    # layout <<- myplot Save layout in output folder
   }
 }
 
