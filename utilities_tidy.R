@@ -135,6 +135,36 @@ row_col_dup = function (sel_data_kp= sel_data_kp) {
   
 }
 
+# check duplicate in plot_number ---------------------------------------
+
+
+plot_number_dup = function (sel_data_kp = sel_data_kp) {
+  
+  plot_number_ct = sel_data_kp %>%
+    count(plot_number, sort=TRUE) %>%
+    filter(n>1) %>%
+    arrange(plot_number)
+  
+  if (nrow(plot_number_ct) > 0) {
+    print("ERROR: There are duplicate plot number: ")
+    #print(row_col_ct)
+    
+    duplicated_plot = sel_data_kp %>%
+      filter(plot_number %in% plot_number_ct$plot_number) %>%
+      select(plot_name, col_number, row_number, plot_number) %>%
+      arrange(plot_number, row_number, col_number )
+    
+    print("Please fix the ERROR!, Here are the plot names:")
+    print(duplicated_plot, n = Inf)
+    
+  }
+  if (nrow(plot_number_ct) == 0) {
+    print("Good, there is no duplicated plot number.")
+  }
+  
+}
+
+
 
 #### function visualize the layout -
 
