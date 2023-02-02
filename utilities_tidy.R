@@ -193,6 +193,34 @@ trial_layout <- function(trial = sel_data_kp) {
   }
 }
 
+# function visualize the layout - families
+
+trial_layout_family <- function(trial = sel_data_kp) {
+  trial_list <- unique(trial$use_trial_name)
+  for (i in 1:length(trial_list)) {
+    trial_i <- trial %>%
+      filter(use_trial_name %in% trial_list[i])
+    myplot <- ggplot(trial_i, aes(x = factor(use_col_number), y = factor(use_row_number))) +
+      geom_tile(color = "black", size = 0.5) + # Black border on tiles
+      labs(x = "col_number", y = "row_number", title = trial_list[i]) +
+      coord_fixed() + # Square tiles
+      theme_minimal() + # Minimal theme, no grey background
+      geom_tile(data = trial_i %>%
+        filter(use_check_test == "check"), fill = "black", show.legend = F) +
+      geom_tile(
+        data = trial_i,
+        aes(fill = use_family_name), col = "black"
+      )
+    theme(
+      panel.grid = element_blank(), # No underlying grid lines
+      axis.text.x = element_text( # Vertical text on x axis
+        angle = 0, vjust = 0.5, hjust = 0
+      )
+    )
+    print(myplot)
+    # layout <<- myplot Save layout in output folder
+  }
+}
 
 ### 2.7 convert accession_name to standard names and add the check_test column
 
