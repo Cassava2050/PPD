@@ -244,7 +244,7 @@ check_clone_name = function(clone_list,
   
   ## 3. other know clones
   # we can add more clones   -------- flexibility
-  known_clone = c("C19", "C243", "C33", "C39", "C413", "TME3", "HB60" , "KU50", "C4")
+  known_clone = c("C19", "C243", "C33", "C39", "C413", "TME3", "HB60" , "KU50", "C4", "BB1", "BB2", "BB3", "KM505", "TMEB419")
   cat("The other known clones:")
   print(sort(known_clone))
   
