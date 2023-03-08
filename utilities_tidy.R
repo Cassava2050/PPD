@@ -164,8 +164,6 @@ plot_number_dup = function (sel_data_kp = sel_data_kp) {
   
 }
 
-
-
 #### function visualize the layout -
 
 trial_layout <- function(trial = sel_data_kp) {
@@ -175,13 +173,14 @@ trial_layout <- function(trial = sel_data_kp) {
       filter(use_trial_name %in% trial_list[i])
     myplot <- ggplot(trial_i, aes(x = factor(use_col_number), y = factor(use_row_number), fill = factor(use_rep_number))) +
       geom_tile(color = "black", size = 0.5) + # Black border on tiles
-      labs(x = "col_number", y = "row_number", fill = "rep", title = trial_list[i]) +
-      coord_fixed() + # Square tiles
-      theme_minimal() + # Minimal theme, no grey background
       geom_tile(
         data = trial_i %>% filter(use_check_test == "check"),
         aes(fill = use_check_test), col = "black"
       ) +
+      geom_text(aes(label = use_plot_number), size = 2) +
+      labs(x = "col_number", y = "row_number", fill = "rep", title = trial_list[i]) +
+      coord_fixed() + # Square tiles
+      theme_minimal() + # Minimal theme, no grey background
       theme(
         panel.grid = element_blank(), # No underlying grid lines
         axis.text.x = element_text( # Vertical text on x axis
