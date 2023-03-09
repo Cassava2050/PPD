@@ -177,18 +177,13 @@ trial_layout <- function(trial = sel_data_kp) {
         data = trial_i %>% filter(use_check_test == "check"),
         aes(fill = use_check_test), col = "black"
       ) +
-      geom_text(aes(label = use_plot_number), size = 2) +
+      geom_text(data = trial_i %>% filter(use_check_test == "check"),
+        aes(label = use_accession_name), size = 2) +
       labs(x = "col_number", y = "row_number", fill = "rep", title = trial_list[i]) +
-      coord_fixed() + # Square tiles
-      theme_minimal() + # Minimal theme, no grey background
-      theme(
-        panel.grid = element_blank(), # No underlying grid lines
-        axis.text.x = element_text( # Vertical text on x axis
-          angle = 0, vjust = 0.5, hjust = 0
-        )
-      )
-    print(myplot)
-    # layout <<- myplot Save layout in output folder
+      coord_fixed() + # Square tiles 
+      theme_xiaofei() 
+    
+      print(myplot)
   }
 }
 
