@@ -179,6 +179,8 @@ trial_layout <- function(trial = sel_data_kp) {
       ) +
       geom_text(data = trial_i %>% filter(use_check_test == "check"),
         aes(label = use_accession_name), size = 2) +
+      geom_text(data = trial_i %>% filter(use_check_test == "test"),
+                aes(label = use_plot_number), size = 3) +
       labs(x = "col_number", y = "row_number", fill = "rep", title = trial_list[i]) +
       coord_fixed() + # Square tiles 
       theme_xiaofei() 
