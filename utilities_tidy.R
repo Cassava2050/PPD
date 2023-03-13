@@ -629,57 +629,51 @@ remove_no_var = function(my_dat) {
   
 }
 
-
-remove_no_var_tidy = function(my_dat) {
-
-# remove columns with all NA
-not_all_na = function(x) any(!is.na(x))
-my_dat_noNA = my_dat %>% select_if(not_all_na)
-
-mean_trial = my_dat[, c("trial_name",  all_of(analysis_trait))] %>%
-  group_by(trial_name) %>%
-  summarise_all(mean, na.rm=TRUE)
-
-sd_trial = my_dat[, c("trial_name",  all_of(analysis_trait))] %>%
-  group_by(trial_name) %>%
-  summarise_all(sd, na.rm=TRUE)
-print(sd_trial)
-
-sd_mean = colMeans(sd_trial[, c( analysis_trait)] , na.rm = TRUE)
-sd_mean = data.frame (sd_mean) %>%
-  rownames_to_column(var = "trait") %>%
-  rename(mean_of_sd = sd_mean)
-
-print("The mean of SD of each trait:")
-
-sd_mean <<- sd_mean
-master_data[["mean_of_sd"]] = sd_mean[order(sd_mean$mean_of_sd),]   ## --------save mean of sd
-
-
-sd_mean_0 = sd_mean %>%
-  filter(mean_of_sd == 0 )
-
-if (nrow(sd_mean_0) ==0) {
-  #print("Good, no traits without variance.")
-  trial_rm_sd = my_dat
+# Remove traits with non variation
+remove_no_var_tidy <- function(my_dat, analysis_trait, meta_info) {
+  
+  # remove columns with all NA
+  not_all_na = function(x) any(!is.na(x))
+  my_dat_noNA = my_dat %>% select_if(not_all_na)
+  
+  mean_trial = my_dat[, c("trial_name",  all_of(analysis_trait))] %>%
+    group_by(trial_name) %>%
+    summarise_all(mean, na.rm=TRUE)
+  
+  sd_trial = my_dat[, c("trial_name",  all_of(analysis_trait))] %>%
+    group_by(trial_name) %>%
+    summarise_all(sd, na.rm=TRUE)
+  
+  sd_mean = colMeans(sd_trial[, c(analysis_trait)] , na.rm = TRUE)
+  sd_mean = data.frame (sd_mean) %>%
+    rownames_to_column(var = "trait") %>%
+    rename(mean_of_sd = sd_mean) %>% 
+    arrange(mean_of_sd)
+  
+  print("The mean of SD of each trait:")
+  print(sd_mean)
+  sd_mean <<- sd_mean
+  
+  sd_mean_0 = sd_mean %>%
+    filter(mean_of_sd == 0 )
+  
+  if (nrow(sd_mean_0) ==0) {
+    print("Good, no traits without variance.")
+    trial_rm_sd = my_dat
+  }else{ 
+    print("The traits without variation are:")
+    print(sd_mean_0)
+    
+    analysis_trait = analysis_trait[!analysis_trait %in% sd_mean_0$trait]
+    
+    trial_rm_sd = my_dat %>%
+      select(all_of(meta_info), all_of(analysis_trait))
+    print("We have removed the trait with SD=0")
+    return(trial_rm_sd)
+    
+  }
 }
 
-if (nrow(sd_mean_0) >0) {
-  print("The traits without variation:")
-  paged_table(sd_mean_0)
-  print("Remove the traits from the trial data")
-  
-  
-  analysis_trait = analysis_trait[!analysis_trait %in% sd_mean_0$trait]
-  
-  trial_rm_sd = my_dat %>%
-    select(all_of(meta_info), all_of(analysis_trait))
-  return(my_dat)
-}
-
-print("We removed the trait with SD=0")
-
-}
 
 
 #### __7. count of clones in each trial and environment__
