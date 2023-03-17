@@ -439,45 +439,38 @@ is_numeric = function (trial_data) {
 
 ### 2.9 add GIS information 
 
-# the list of location was downloaded from CassavaBase on June 06
-# and then match the information with the sheet, Nelson
+add_GIS <-
+  function(trial_data = trial_standard) {
+    GIS_info <-
+      read.csv("https://raw.githubusercontent.com/lfdelgadom/standar_col_names_CB/main/standardization%20trait%20trial%20location.csv", na.strings = "", check.names = F)
 
+    GIS_info <- GIS_info %>%
+      select(
+        "location_CassavaBase", "use_latitude", "use_longitude",
+        "use_altitude", "use_department", "use_country", "use_ag_zone", "use_location_short"
+      ) %>% 
+      mutate(use_longitude = as.numeric(use_longitude), 
+             use_latitude = as.numeric(use_latitude))
 
+    trial_loc <- unique(trial_data$use_location)
+    print("The locations are:")
+    print(trial_loc)
+    in_database <- trial_loc %in% GIS_info$location_CassavaBase
 
-add_GIS = function(trial_data = trial_standard) {
-  # read in GIS information from the "standard" file
-  # base_folder = "D:\\OneDrive - CGIAR\\Data Analysis\\data_analysis\\data\\"
-  # loc_file = "001_standardization_trait_trial_location.xlsx"  # updated on June 7
-  GIS_info = 
-    read.csv("https://raw.githubusercontent.com/lfdelgadom/standar_col_names_CB/main/standardization%20trait%20trial%20location.csv",
-                         na.strings = "", check.names = F)
-  GIS_info = GIS_info %>%
-    select("location_CassavaBase", "use_latitude" ,  "use_longitude",
-           "use_altitude", "use_department", "use_country",  "use_ag_zone", "use_location_short"  )
-  GIS_info$use_longitude = as.numeric(GIS_info$use_longitude )
-  
-  trial_loc = unique(trial_data$use_location)
-  print("The locations are:")
-  print(trial_loc)
-  in_database = trial_loc %in% GIS_info$location_CassavaBase
-  
-  if(sum(in_database) != length(in_database)){
-    trial_loc_database = data.frame(trial_loc_list = trial_loc,
-                                    loc_in_CassavaBase = in_database)
-    print("Some locations are not in the database, please add them in:")
-    print("D:\\OneDrive - CGIAR\\01_2021_2021\\01_CassavaBase_data\\")
-    print("001_standardization_trait_trial_location.xlsx")
-    print("The sheet is -- CassavaBase --")
-    print(trial_loc_database)
+    if (sum(in_database) != length(in_database)) {
+      trial_loc_database <- data.frame(
+        trial_loc_list = trial_loc,
+        loc_in_CassavaBase = in_database
+      )
+     print(trial_loc_database)
+    }
+
+    if (sum(in_database) == length(in_database)) {
+      print("All locations are in the database.")
+      trial_data <- left_join(trial_data, GIS_info, by = c("use_location" = "location_CassavaBase"))
+    }
+    return(trial_data)
   }
-  
-  if(sum(in_database) == length(in_database)) {
-    print("All locations are in the database.")
-    trial_data = left_join(trial_data, GIS_info, by = c("use_location" = "location_CassavaBase"))
-    
-  }
-  return(trial_data)
-}
 
 
 ### 2.13  visualize the difference among trials in all traits **********************
