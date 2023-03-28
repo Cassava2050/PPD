@@ -14,7 +14,7 @@ ifelse(is.na(indata),
        indata)
 
 
-  cat("\nTrials interested are:\n", unique(sel_data[, c(6)]))
+  cat("\nTrials interested are:\n", unique(indata[, c(6)]))
 
   return(indata) 
 }
