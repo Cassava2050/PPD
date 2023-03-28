@@ -1,6 +1,6 @@
 # Functions to make tidy data
 
-read_cassavabase <- function(phenotypeFile) {
+rread_cassavabase <- function(phenotypeFile) {
   
   possibly_read_csv <- purrr::possibly(read.csv, NA)
   # works if from Download page
@@ -13,10 +13,9 @@ ifelse(is.na(indata),
                                    stringsAsFactors = F, skip = skip_col, check.names = F),
        indata)
 
-print(paste0("Here are the trials and the study interested is ", trial_interest))
 
-#print(indata %>% distinct(studyName))
-    
+  cat("\nTrials interested are:\n", unique(sel_data[, c(6)]))
+
   return(indata) 
 }
 
