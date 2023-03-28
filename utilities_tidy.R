@@ -1,6 +1,6 @@
 # Functions to make tidy data
 
-rread_cassavabase <- function(phenotypeFile) {
+read_cassavabase <- function(phenotypeFile) {
   
   possibly_read_csv <- purrr::possibly(read.csv, NA)
   # works if from Download page
