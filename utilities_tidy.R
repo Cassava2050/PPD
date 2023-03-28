@@ -171,7 +171,7 @@ trial_layout <- function(trial = sel_data_kp) {
     trial_i <- trial %>%
       filter(use_trial_name %in% trial_list[i])
     myplot <- ggplot(trial_i, aes(x = factor(use_col_number), y = factor(use_row_number), fill = factor(use_rep_number))) +
-      geom_tile(color = "black", size = 0.5) + # Black border on tiles
+      geom_tile(color = "black", linewidth = 0.5) + # Black border on tiles
       geom_tile(
         data = trial_i %>% filter(use_check_test == "check"),
         aes(fill = use_check_test), col = "black"
