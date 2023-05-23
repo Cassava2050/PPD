@@ -190,6 +190,9 @@ trial_layout <- function(trial = sel_data_kp) {
       theme_xiaofei()
 
     print(myplot)
+    
+    ggsave(paste("images\\layout", trial_list[i], Sys.Date(), ".png", sep = "_"),
+       plot = myplot, units = "in", dpi = 300, width = 14, height = 12)
   }
 }
 
