@@ -17,7 +17,7 @@ This is a document showing the data analysis from the genetic study of tolerance
 rm(list = ls())
 library(pacman)
 pacman::p_load(tidyverse, fauxnaif, readxl, yarrr, dplyr, knitr, rmarkdown, statgenSTA, statgenGxE, openxlsx, QBMS, magrittr, agriutilities, asreml)
-source("utilities_tidy.R")
+source("https://raw.githubusercontent.com/Cassava2050/PPD/main/utilities_tidy.R")
 ```
 
 ## Load the files to check
@@ -362,6 +362,17 @@ if (trial_interest == "BCGN1") {
         ifelse(trial_name == "201681BCGN1_ciat" | plot_name == "201681BCGN1_ciat_rep1_GM3732-13_15", NA, HCN_linamarase_10mon)
     )
 }
+
+# There are yield errors 
+
+trial_tidy_all <- trial_tidy_all %>%
+    mutate(
+      yield_ha = ifelse(plot_name == "201680BCGN1_ciat_rep1_GM3732-5_2", NA, yield_ha), 
+      yield_ha = ifelse(plot_name == "201680BCGN1_ciat_rep1_GM3736-21_22", NA, yield_ha),
+      yield_ha = ifelse(plot_name == "201680BCGN1_ciat_rep1_GM3736-26_24", NA, yield_ha),
+      yield_ha = ifelse(plot_name == "201680BCGN1_ciat_rep1_GM3736-51_33", NA, yield_ha),
+      yield_ha = ifelse(plot_name == "201680BCGN1_ciat_rep1_GM905-52_41", NA, yield_ha),
+      yield_ha = ifelse(plot_name == "201680BCGN1_ciat_rep1_GM905-57_12", NA, yield_ha)) 
 ```
 
 ## Reshape the data
@@ -520,24 +531,40 @@ PPD <- PPD %>%
   mutate(
     Plot_name = str_split_fixed(plot_name, "_p", 2)[, 1],
     plant = str_split_fixed(plot_name, "_p", 2)[, 2]
-  )
-
-# paste letter "p" to the plant column
-
-PPD <- PPD %>%
+  ) %>% # paste letter "p" to the plant column
   mutate(plant = paste0("p", plant)) %>%
   mutate(
     Plant = str_split_fixed(plant, "_S", 2)[, 1],
     slice = str_split_fixed(plot_name, "_S", 2)[, 2]
-  )
-
-# paste letter "S" to the slice column, remove repeat columns and make all colname
-# tolower
-
-PPD <- PPD %>%
+  ) %>%  # paste letter "S" to the slice column, remove repeat columns and 
   mutate(slice = paste0("s", slice)) %>%
   select(-c(plot_name, plant)) %>%
-  rename_all(tolower)
+  rename_all(tolower) # make all colname tolower
+
+# paste letter "p" to the plant column
+
+# PPD <- PPD %>%
+#   mutate(plant = paste0("p", plant)) %>%
+#   mutate(
+#     Plant = str_split_fixed(plant, "_S", 2)[, 1],
+#     slice = str_split_fixed(plot_name, "_S", 2)[, 2]
+#   )
+# 
+# # paste letter "S" to the slice column, remove repeat columns and make all colname
+# # tolower
+# 
+# PPD <- PPD %>%
+#   mutate(slice = paste0("s", slice)) %>%
+#   select(-c(plot_name, plant)) %>%
+#   rename_all(tolower)
+
+# LAB
+PPD_Becerra <- PPD %>% 
+  filter(slice %in% c("slice3", "slice4", "slice5")) %>% 
+  group_by(trial_name, plot_name) %>%
+  summarise(ppd = mean(ppd)) %>% 
+  ungroup()
+
 
 # group by trial_name, plot_name
 
@@ -583,6 +610,7 @@ if (FALSE) {
 ## Save the data raw pivot
 
 ```{r}
+master_data <- list()
 master_data[[paste0("raw_data_pivot_", trial_interest)]] <- my_dat
 ```
 
@@ -639,7 +667,8 @@ plot_bxp <- my_dat %>%
     "DM_gravity", 
     "plant_type",
     "branch_number",
-    "root_type1_5"
+    "root_type1_5",
+    "height_1st_branch"
   )) %>%
   ggplot(aes(x = trial_name, y = values)) +
   geom_violin(trim = FALSE, fill = "gray") +
@@ -653,7 +682,7 @@ plot_bxp <- my_dat %>%
     
   ) +
   facet_wrap(~var,
-    ncol = 3, scales = "free_y",
+    ncol = 2, scales = "free_y",
     labeller = as_labeller(fct_labels)
   ) +
   theme(
@@ -665,9 +694,9 @@ plot_bxp <- my_dat %>%
 plot_bxp
 
 
-ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
-    plot = plot_bxp, units = "in", dpi = 300, width = 12, height = 9
-  )
+# ggsave(paste0("images\\boxplot_", trial_interest, "_", Sys.Date(), ".png"),
+#     plot = plot_bxp, units = "in", dpi = 300, width = 12, height = 9
+#   )
 
 ```
 
@@ -726,7 +755,7 @@ for (var in trait_ideal_pivot) {
       panel.grid.minor.x = element_blank(), panel.grid.major = element_blank()
     )
   g1
-  ggsave(paste0("images/", var, trial_interest, Sys.Date(),".png"), g1, units = "in", dpi = 300, width = 7, height = 7)
+  # ggsave(paste0("images/", var, trial_interest, Sys.Date(),".png"), g1, units = "in", dpi = 300, width = 7, height = 7)
 }
 ```
 
@@ -768,20 +797,25 @@ for (var in trait_ideal_pivot) {
 }
 ```
 
-# MET
+# MET fa2
 
 ```{r}
 
 my_dat <- my_dat %>% mutate(trial_name = as.factor(trial_name), 
                             accession_name = as.factor(accession_name))
 h2_fa2 <- c()
+
 i <- 1
 
 # I've removed 
 # DM_gravity was remove because is redundant with DM_oven
 # "plant_type"    "branch_number" "root_type1_5" fitted in the model
 
-trait_ideal_pivot <- trait_ideal_pivot[-c(2, 3, 5, 8)]
+trait_ideal_pivot <- trait_ideal_pivot[!trait_ideal_pivot %in% c("DM_gravity", 
+                                                                "plant_type",
+                                                                "branch_number",
+                                                                "root_type1_5",
+                                                                "cook_time")]
 
 for (var in trait_ideal_pivot) {
   trials <- resum_tables %>%
@@ -800,6 +834,10 @@ for (var in trait_ideal_pivot) {
 
   model_MET_2stage <- update.asreml(model_MET_2stage)
   model_MET_2stage <- update.asreml(model_MET_2stage)
+  model_MET_2stage <- update.asreml(model_MET_2stage)
+
+  summary(model_MET_2stage)$varcomp
+  
   pred_f <- predict(model_MET_2stage, classify = "accession_name")
   PP <- pred_f$pvals %>% mutate(variable = var)
 
@@ -807,8 +845,8 @@ for (var in trait_ideal_pivot) {
     model_fa = model_MET_2stage,
     genotype = "accession_name",
     env = "trial_name",
-    vc.model = "fa2"
-  )$H2Cullis
+    vc_model = "fa2"
+  )
   names(h2_fa2)[i] <- var
 
   if (i == 1) {
@@ -821,6 +859,101 @@ for (var in trait_ideal_pivot) {
 }
 ```
 
+# MET fa1
+
+```{r}
+
+my_dat <- my_dat %>% mutate(trial_name = as.factor(trial_name), 
+                            accession_name = as.factor(accession_name))
+h2_fa1 <- c()
+
+i <- 1
+
+# I've removed 
+# DM_gravity was remove because is redundant with DM_oven
+# "plant_type"    "branch_number" "root_type1_5" fitted in the model
+
+trait_ideal_pivot <- trait_ideal_pivot[!trait_ideal_pivot %in% c("DM_gravity", 
+                                                                "plant_type",
+                                                                "branch_number",
+                                                                "root_type1_5",
+                                                                "cook_time")]
+
+for (var in trait_ideal_pivot) {
+  trials <- resum_tables %>%
+    filter(trait == var, n_percent < 1) %>%
+    pull(trial_name)
+  eqt_fixed <- reformulate(c("trial_name"), response = var)
+
+  model_MET_2stage <- asreml(
+    fixed = eqt_fixed,
+    random = ~ fa(trial_name, 1):accession_name,
+    data = my_dat %>% filter(trial_name %in% trials) %>% droplevels(),
+    family = asr_gaussian(dispersion = 1),
+    na.action = list(x = "exclude", y = "exclude"),
+    trace = 0
+  )
+
+  model_MET_2stage <- update.asreml(model_MET_2stage)
+  model_MET_2stage <- update.asreml(model_MET_2stage)
+  model_MET_2stage <- update.asreml(model_MET_2stage)
+
+  summary(model_MET_2stage)$varcomp
+  
+  pred_f <- predict(model_MET_2stage, classify = "accession_name")
+  PP <- pred_f$pvals %>% mutate(variable = var)
+
+  h2_fa1[i] <- agriutilities::heritability_fa(
+    model_fa = model_MET_2stage,
+    genotype = "accession_name",
+    env = "trial_name",
+    vc_model = "fa1"
+  )
+  names(h2_fa1)[i] <- var
+
+  if (i == 1) {
+    pvals_table <- PP
+  } else {
+    pvals_table <- rbind.data.frame(pvals_table, PP)
+  }
+
+  i <- i + 1
+}
+
+# variance covariance matrix 
+vc <- summary(model_MET_2stage)$varcomp
+(R<-vc[1:10,1])
+(L<-vc[11:20,1])
+(V<-L%*%t(L)+diag(R))
+G.fa <- cov2cor(V)
+round(G.fa,3)
+```
+
+## Cook time trait
+Cook time trait has very low heritability, I need to fix this data checking the raw data. After checking the different trials across years, I decided to remove Cooking time from the study. The correlations between the trials were so low. 
+
+```{r}
+my_dat %>% select(trial_name)
+
+var = "cook_time"
+cook_time_spread <- my_dat %>% 
+    select(trial_name, accession_name, .data[[var]]) %>%
+    distinct() %>%
+    group_by(trial_name, accession_name) %>% 
+    pivot_wider(names_from = trial_name, values_from = .data[[var]]) 
+
+# remove empty cols
+
+  cook_time_spread <- cook_time_spread[, colSums(is.na(cook_time_spread)) < nrow(cook_time_spread)]
+  
+  
+M <- cor(as.matrix(cook_time_spread[, -1]), use = "pairwise.complete.obs")
+
+M
+
+```
+
+
 ## Model briefly (fill the table for manuscript)
 
 I run a simple model, for extract the variance components to build the table
@@ -832,6 +965,7 @@ for (var in trait_ideal_pivot) {
   trials <- resum_tables %>%
     filter(trait == var, n_percent < 1) %>%
     pull(trial_name)
+  
   eqt_fixed <- reformulate(c("trial_name"), response = var)
 
   model_MET_2stage <- asreml(
@@ -875,14 +1009,11 @@ sapply(my_dat[trait_ideal_pivot], multiple.func)
 ## Save the heritabilities
 
 ```{r}
-
-h2 <- h2_fa2 %>%
-  as.data.frame() %>%
-  tibble::rownames_to_column("trait")
-colnames(h2) <- c("var", "h2")
+h2_fa1 <- as.data.frame(do.call(cbind, h2_fa1)) %>% 
+  pivot_longer(everything(), names_to = "trait", values_to = "h2")
 
 # save the heritability
-master_data[[paste0("h2_", trial_interest)]] <- h2
+master_data[[paste0("h2_", trial_interest)]] <- h2_fa1
 ```
 
 ## Bind and save the BLUPs
@@ -897,7 +1028,7 @@ blup_table <- pvals_table %>%
   filter(!is.na(ppd))
 
 #save the BLUPs data
-master_data[[paste0("BLUPs_", trial_interest)]] <- blup_table
+master_data[[paste0("BLUPs_", trial_interest)]] <- blup_table  
 ```
 
 ## BLUEs or raw data across the trials
@@ -938,19 +1069,68 @@ for (var in trait_ideal_pivot) {
 
 ```
 
+## BLUE and BLUP data together
+
+```{r}
+
+
+BLUEs <- my_dat %>% select(trial_name, accession_name, trait_ideal_pivot) %>% 
+  pivot_wider(names_from = trial_name, values_from = trait_ideal_pivot)
+
+colnames(BLUEs)[-1] <- paste("BLUEs", colnames(BLUEs)[-1], sep = "_")
+
+BLUEs_BLUPs <- BLUEs %>% 
+  left_join(pvals_table %>%
+  select(-c(status)) %>%
+  group_by(variable, accession_name) %>% 
+      rename(
+        BLUPs = predicted.value,
+        seBLUPs = std.error
+      ) %>%
+      pivot_wider(names_from = "variable", values_from = c("BLUPs", "seBLUPs")),
+    by = "accession_name"
+  ) %>% 
+  arrange(desc(BLUPs_DM_raw)) %>% 
+  arrange(is.na(across(where(is.numeric))), across(where(is.numeric))) %>%
+  mutate(across(where(is.numeric), round, 2))
+
+ # remove all NA columns
+BLUEs_BLUPs <- BLUEs_BLUPs[, colSums(is.na(BLUEs_BLUPs)) < nrow(BLUEs_BLUPs)]
+
+# sort header
+header_sort = vector()
+for (i in 1:length(trait_ideal_pivot)) {
+  
+  header_sort = c(header_sort, 
+                  grep(trait_ideal_pivot[i], sort(names(BLUEs_BLUPs)), value=TRUE) 
+  )
+  
+}
+
+BLUEs_BLUPs <- BLUEs_BLUPs %>%
+  select(accession_name, all_of(header_sort)) 
+
+
+BLUEs_BLUPs <- BLUEs_BLUPs %>% 
+  relocate(colnames(BLUEs_BLUPs)[str_detect(colnames(BLUEs_BLUPs), "DM_raw")], .after = accession_name)
+
+
+master_data[["BLUEs_BLUPs_MET"]] = BLUEs_BLUPs
+```
+
+
 ## Save the master data
 
 ```{r}
 
 # In some cases there were long names that need to be replace
 names(master_data)[8] <- "BLUP_BLUE__1st_branch_BCGN1"
-names(master_data)[11] <- "BLUP_BLUE__bcaroteno_BCGN1"
-names(master_data)[12] <- "BLUP_BLUE__caroteno_BCGN1"
+names(master_data)[11] <- "BLUP_BLUE__caroteno_BCGN1" #"BLUP_BLUE__bcaroteno_BCGN1"
+names(master_data)[10] <- "BLUP_BLUE__bcaroteno_BCGN1"
 
 meta_file_name <- paste0(folder, paste0(experiment, "_", trial_interest, "_master_results_",
-  Sys.Date(), "_.xlsx"
-)
-)
+  Sys.Date(), "_.xlsx"))
+
 write.xlsx(master_data, file = meta_file_name)
 ```
 
@@ -962,10 +1142,10 @@ list_file <- list.files(folder)
 sel_file <- list_file[str_detect(list_file, "_master_results_") &
   str_detect(list_file, trial_interest)]
 
-sel_file[1]
+sel_file[2]
 blupDF_kp <- read_excel(
   paste(folder,
-    sel_file[1],
+    sel_file[2],
     sep = ""
   ),
   sheet = paste0("BLUPs_", trial_interest)
@@ -977,10 +1157,40 @@ blupDF_kp %>%
 
 ```
 
-# Genetic correlation
+## Genotypic correlation (BLUP values)
 
-See the script call it "correlations". Was not possible to export the file using dev.off() function;
-I need to find the way to use that function inside of a Quarto document.
+```{r}
+
+fct_labels <- c(
+  DM_raw = "Dry matter by oven (%)",
+  DM_gravity = "Dry matter by gravimetry (%)",
+  plant_type = "Plant type",
+  yield_ha = "Yield (t/ha)",
+  branch_number = "Branching number",
+  height = "Plant height (cm)",
+  height_1st_branch = "1st branch height (cm)",
+  root_type1_5 = "Root type",
+  cook_time = "Cooking time (min)",
+  HCN_linamarase = "Cyanide content (ppm)",
+  betacarotenoid_nirs = "B-carotene by NIR (ug/g)",
+  carotenoidtotal_nirs = "Total carotenoids by NIR (ug/g)",
+  ppd = "PPD"
+)
+
+colnames(blupDF_kp) <- c("accession_name", "B-carotene by NIR (ug/g)", "Total carotenoids by NIR (ug/g)", "Dry matter by oven (%)", "Cyanide content (ppm)", "Plant height (cm)", "1st branch height (cm)", "PPD", "Yield (t/ha)")
+
+geno_cor <- gg_cor(
+  colours = c("red", "white", "blue"),
+  data = blupDF_kp, # remove carotenoids
+  label_size = 4
+) 
+
+geno_cor
+
+# 
+# ggsave(paste0("images\\geno_corr", trial_interest, "_", Sys.Date(), ".png"),
+#        plot = geno_cor, units = "in", dpi = 300, width = 12, height = 8)
+```
 
 
 ## Selection index
@@ -988,16 +1198,17 @@ I need to find the way to use that function inside of a Quarto document.
 ```{r}
 
 index_col <- c(
-  "ppd", "carotenoidtotal_nirs", "DM_raw", "HCN_linamarase",
-  "yield_ha", "height_1st_branch"
+  "PPD", "Dry matter by oven (%)", "Yield (t/ha)", "1st branch height (cm)"
 )
 
 index_dat <- blupDF_kp %>%
-  select("accession_name", all_of(index_col)) %>%
+  dplyr::select("accession_name", index_col) %>%
   column_to_rownames("accession_name")
 ```
 
-## Johan's function
+## Index selection function
+
+Include this function on utilities and make a package with utilities
 
 ```{r}
 # multi-trait -------------------------------------------------------------
@@ -1080,26 +1291,15 @@ selIndex <- function (Y, b, scale = FALSE)
 # I'm going to remove them temporarily, high frogskin presence
 
 # PCA
-pcs <- index_dat %>%
+pcs <- blupDF_kp %>%
+  column_to_rownames("accession_name") %>% 
   dplyr::select_if(is.numeric) %>%
   drop_na()
-
-# Change colnames ---------------------------------------------------------
-
-colnames(pcs) <- c(
-  "PPD", 
-  "Total carotenoids by NIR (ug/g)",
-  "Dry matter by oven (%)",
-  "Cyanide content (ppm)", 
-  "Yield (t/ha)", 
-  "1st branch height (cm)"
-)
-
 
 pca <- PCA(pcs)
 
 # Interactiva
-explor(pca)
+#explor(pca)
 ```
 
 ## Eigenvalues
@@ -1116,7 +1316,7 @@ var_plot <- fviz_pca_var(pca, col.var = "black", repel = T) +
   ggtitle(paste0("PCA_", pop)) +
   theme_xiaofei()
 
-ggsave(paste0("images/PCA_var_", trial_interest, Sys.Date(), ".png"), plot = var_plot, units = "in", dpi = 300, width = 8, height = 8)
+# ggsave(paste0("images/PCA_var_", trial_interest, Sys.Date(), ".png"), plot = var_plot, units = "in", dpi = 300, width = 8, height = 8)
 ```
 
 ## Individuals
@@ -1126,8 +1326,8 @@ ggsave(paste0("images/PCA_var_", trial_interest, Sys.Date(), ".png"), plot = var
 IND <- fviz_pca_ind(pca, repel = T, alpha.ind = 0.3, col.ind = "grey20", labelsize = 3) +
   ggtitle(paste0("Individuals - PCA_", pop)) +
   theme_xiaofei()
-
-ggsave(paste0("images/PCA_ind", trial_interest, Sys.Date(), ".png"), plot = IND, units = "in", dpi = 300, width = 8, height = 8)
+# 
+# ggsave(paste0("images/PCA_ind", trial_interest, Sys.Date(), ".png"), plot = IND, units = "in", dpi = 300, width = 8, height = 8)
 ```
 
 ## Biplot
@@ -1153,8 +1353,8 @@ test <- ggdraw() +
     x = c(0, 0.5, 0), y = c(1, 1, 0.5)
   )
 
-
-ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = test, units = "in", dpi = 300, width = 14, height = 12)
+# 
+# ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = test, units = "in", dpi = 300, width = 14, height = 12)
 ```
 
 ## Index selection
@@ -1165,20 +1365,40 @@ TestIndex_ <- index_dat %>%
   rownames_to_column("accession_name") %>%
   drop_na() 
 
-res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, 10, 10, -10, 10, 10), percentage = 0.20)
+res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, 10, 10, -10), percentage = 0.20)
 res.pca_final <- res.pca$final
 res.pca_final
 ggsave(paste("images/selection",  trial_interest, Sys.Date(), ".png"), plot = res.pca_final, units = "in", dpi = 300, width = 10, height = 10)
 
 res.pca$selection
+selections <- res.pca$results %>% rownames_to_column(var = "accession_name") %>% 
+  mutate(across(where(is.numeric), round, 2))
+
+
+
 res.pca$results %>% 
   mutate(across(where(is.numeric), round, 3)) %>% 
   write.table("clipboard", sep="\t", row.names=TRUE, col.names=TRUE)
-dim(res.pca$selection)
-
-
-
-
+dim(res.pca$selection) 
 ```
 
-CPDCR5B-102, CPDCR5B-055, CPDCR1B-034
+## Add index column to BLUEs_BLUPs_MET
+
+```{r}
+BLUEs_BLUPs <- BLUEs_BLUPs %>% 
+  left_join(selections[-c(2:5)], by = c("accession_name" = "accession_name")) %>% 
+  relocate(index, selected, .before = 2) %>% 
+  arrange(is.na(across(where(is.numeric))), across(where(is.numeric)))
+
+
+master_data[["BLUEs_BLUPs_MET"]] = BLUEs_BLUPs
+```
+
+## Save the master data results
+
+```{r}
+folder_output <- here::here("output//")
+meta_file_name <- paste0(folder_output, paste0("2022", trial_interest, "_master_results_", Sys.Date(), "_.xlsx" ))
+write.xlsx(master_data, file = meta_file_name)
+```
+

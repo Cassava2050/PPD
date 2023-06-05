@@ -9,7 +9,7 @@ library(corrplot)
 
 # Load the file -----------------------------------------------------------
 
-
+trial_interest = "PDGN1"
 
 list_file <- list.files(folder)
 
@@ -27,19 +27,31 @@ blupDF_kp <- read_excel(
 
 
 # Remove row names --------------------------------------------------------
-
+# remove cooking time also
 blupDF_value <- blupDF_kp %>%
-  select(-accession_name)
+  select(-c(accession_name), cook_time, DM_raw, HCN_linamarase, height, ppd, yield_ha) 
+  
 
 
 # Change colnames ---------------------------------------------------------
 
+
 colnames(blupDF_value) <- c(
   "B-carotene by NIR (ug/g)", "Total carotenoids by NIR (ug/g)",
-  "Cooking time (min)", "Dry matter by oven (%)",
+  "Dry matter by oven (%)",
   "Cyanide content (ppm)", "Plant height (cm)", "1st branch height (cm)",
   "PPD", "Yield (t/ha)"
 )
+
+if (trial_interest == "PDGN1") {
+  colnames(blupDF_value) <- c(
+    "Cooking time (min)",
+    "Dry matter by oven (%)",
+    "Cyanide content (ppm)", "Plant height (cm)",
+    "PPD", "Yield (t/ha)"
+  ) 
+  
+}
 
 
 
