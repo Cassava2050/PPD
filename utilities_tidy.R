@@ -13,10 +13,9 @@ ifelse(is.na(indata),
                                    stringsAsFactors = F, skip = skip_col, check.names = F),
        indata)
 
-print(paste0("Here are the trials and the study interested is ", trial_interest))
 
-#print(indata %>% distinct(studyName))
-    
+  cat("\nTrials interested are:\n", unique(indata[, c(6)]))
+
   return(indata) 
 }
 
@@ -164,8 +163,6 @@ plot_number_dup = function (sel_data_kp = sel_data_kp) {
   
 }
 
-
-
 #### function visualize the layout -
 
 trial_layout <- function(trial = sel_data_kp) {
@@ -174,22 +171,28 @@ trial_layout <- function(trial = sel_data_kp) {
     trial_i <- trial %>%
       filter(use_trial_name %in% trial_list[i])
     myplot <- ggplot(trial_i, aes(x = factor(use_col_number), y = factor(use_row_number), fill = factor(use_rep_number))) +
-      geom_tile(color = "black", size = 0.5) + # Black border on tiles
-      labs(x = "col_number", y = "row_number", fill = "rep", title = trial_list[i]) +
-      coord_fixed() + # Square tiles
-      theme_minimal() + # Minimal theme, no grey background
+      geom_tile(color = "black", linewidth = 0.5) + # Black border on tiles
       geom_tile(
         data = trial_i %>% filter(use_check_test == "check"),
         aes(fill = use_check_test), col = "black"
       ) +
-      theme(
-        panel.grid = element_blank(), # No underlying grid lines
-        axis.text.x = element_text( # Vertical text on x axis
-          angle = 0, vjust = 0.5, hjust = 0
-        )
-      )
+      scale_fill_jco() +
+      geom_text(
+        data = trial_i %>% filter(use_check_test == "check"),
+        aes(label = use_accession_name), size = 2
+      ) +
+      geom_text(
+        data = trial_i %>% filter(use_check_test == "test"),
+        aes(label = use_plot_number), size = 3
+      ) +
+      labs(x = "col_number", y = "row_number", fill = "rep", title = trial_list[i]) +
+      coord_fixed() + # Square tiles
+      theme_xiaofei()
+
     print(myplot)
-    # layout <<- myplot Save layout in output folder
+    
+    ggsave(paste("images\\layout", trial_list[i], Sys.Date(), ".png", sep = "_"),
+       plot = myplot, units = "in", dpi = 300, width = 14, height = 12)
   }
 }
 
@@ -244,7 +247,10 @@ check_clone_name = function(clone_list,
   
   ## 3. other know clones
   # we can add more clones   -------- flexibility
-  known_clone = c("C19", "C243", "C33", "C39", "C413", "TME3", "HB60" , "KU50", "C4")
+  known_clone = c("C19", "C243", "C33", "C39", "C413", "TME3", "HB60" , "KU50", 
+                  "C4", "BB1", "BB2", "BB3", "KM505", "TMEB419", "Azulita", "Chocoana",
+                  "CR52A2", "CR52A4", "CR60B10", "FalsaReina", "FALSAREINA", "TME287", 
+                   "P13", "CMB8527")
   cat("The other known clones:")
   print(sort(known_clone))
   
@@ -443,45 +449,38 @@ is_numeric = function (trial_data) {
 
 ### 2.9 add GIS information 
 
-# the list of location was downloaded from CassavaBase on June 06
-# and then match the information with the sheet, Nelson
+add_GIS <-
+  function(trial_data = trial_standard) {
+    GIS_info <-
+      read.csv("https://raw.githubusercontent.com/lfdelgadom/standar_col_names_CB/main/standardization%20trait%20trial%20location.csv", na.strings = "", check.names = F)
 
+    GIS_info <- GIS_info %>%
+      select(
+        "location_CassavaBase", "use_latitude", "use_longitude",
+        "use_altitude", "use_department", "use_country", "use_ag_zone", "use_location_short"
+      ) %>% 
+      mutate(use_longitude = as.numeric(use_longitude), 
+             use_latitude = as.numeric(use_latitude))
 
+    trial_loc <- unique(trial_data$use_location)
+    print("The locations are:")
+    print(trial_loc)
+    in_database <- trial_loc %in% GIS_info$location_CassavaBase
 
-add_GIS = function(trial_data = trial_standard) {
-  # read in GIS information from the "standard" file
-  # base_folder = "D:\\OneDrive - CGIAR\\Data Analysis\\data_analysis\\data\\"
-  # loc_file = "001_standardization_trait_trial_location.xlsx"  # updated on June 7
-  GIS_info = 
-    read.csv("https://raw.githubusercontent.com/lfdelgadom/standar_col_names_CB/main/standardization%20trait%20trial%20location.csv",
-                         na.strings = "", check.names = F)
-  GIS_info = GIS_info %>%
-    select("location_CassavaBase", "use_latitude" ,  "use_longitude",
-           "use_altitude", "use_department", "use_country",  "use_ag_zone", "use_location_short"  )
-  GIS_info$use_longitude = as.numeric(GIS_info$use_longitude )
-  
-  trial_loc = unique(trial_data$use_location)
-  print("The locations are:")
-  print(trial_loc)
-  in_database = trial_loc %in% GIS_info$location_CassavaBase
-  
-  if(sum(in_database) != length(in_database)){
-    trial_loc_database = data.frame(trial_loc_list = trial_loc,
-                                    loc_in_CassavaBase = in_database)
-    print("Some locations are not in the database, please add them in:")
-    print("D:\\OneDrive - CGIAR\\01_2021_2021\\01_CassavaBase_data\\")
-    print("001_standardization_trait_trial_location.xlsx")
-    print("The sheet is -- CassavaBase --")
-    print(trial_loc_database)
+    if (sum(in_database) != length(in_database)) {
+      trial_loc_database <- data.frame(
+        trial_loc_list = trial_loc,
+        loc_in_CassavaBase = in_database
+      )
+     print(trial_loc_database)
+    }
+
+    if (sum(in_database) == length(in_database)) {
+      print("All locations are in the database.")
+      trial_data <- left_join(trial_data, GIS_info, by = c("use_location" = "location_CassavaBase"))
+    }
+    return(trial_data)
   }
-  
-  if(sum(in_database) == length(in_database)) {
-    print("All locations are in the database.")
-    trial_data = left_join(trial_data, GIS_info, by = c("use_location" = "location_CassavaBase"))
-    
-  }
-  return(trial_data)
-}
 
 
 ### 2.13  visualize the difference among trials in all traits **********************
@@ -633,57 +632,51 @@ remove_no_var = function(my_dat) {
   
 }
 
-
-remove_no_var_tidy = function(my_dat) {
-
-# remove columns with all NA
-not_all_na = function(x) any(!is.na(x))
-my_dat_noNA = my_dat %>% select_if(not_all_na)
-
-mean_trial = my_dat[, c("trial_name",  all_of(analysis_trait))] %>%
-  group_by(trial_name) %>%
-  summarise_all(mean, na.rm=TRUE)
-
-sd_trial = my_dat[, c("trial_name",  all_of(analysis_trait))] %>%
-  group_by(trial_name) %>%
-  summarise_all(sd, na.rm=TRUE)
-print(sd_trial)
-
-sd_mean = colMeans(sd_trial[, c( analysis_trait)] , na.rm = TRUE)
-sd_mean = data.frame (sd_mean) %>%
-  rownames_to_column(var = "trait") %>%
-  rename(mean_of_sd = sd_mean)
-
-print("The mean of SD of each trait:")
-
-sd_mean <<- sd_mean
-master_data[["mean_of_sd"]] = sd_mean[order(sd_mean$mean_of_sd),]   ## --------save mean of sd
-
-
-sd_mean_0 = sd_mean %>%
-  filter(mean_of_sd == 0 )
-
-if (nrow(sd_mean_0) ==0) {
-  #print("Good, no traits without variance.")
-  trial_rm_sd = my_dat
+# Remove traits with non variation
+remove_no_var_tidy <- function(my_dat, analysis_trait, meta_info) {
+  
+  # remove columns with all NA
+  not_all_na = function(x) any(!is.na(x))
+  my_dat_noNA = my_dat %>% select_if(not_all_na)
+  
+  mean_trial = my_dat[, c("trial_name",  all_of(analysis_trait))] %>%
+    group_by(trial_name) %>%
+    summarise_all(mean, na.rm=TRUE)
+  
+  sd_trial = my_dat[, c("trial_name",  all_of(analysis_trait))] %>%
+    group_by(trial_name) %>%
+    summarise_all(sd, na.rm=TRUE)
+  
+  sd_mean = colMeans(sd_trial[, c(analysis_trait)] , na.rm = TRUE)
+  sd_mean = data.frame (sd_mean) %>%
+    rownames_to_column(var = "trait") %>%
+    rename(mean_of_sd = sd_mean) %>% 
+    arrange(mean_of_sd)
+  
+  print("The mean of SD of each trait:")
+  print(sd_mean)
+  sd_mean <<- sd_mean
+  
+  sd_mean_0 = sd_mean %>%
+    filter(mean_of_sd == 0 )
+  
+  if (nrow(sd_mean_0) ==0) {
+    print("Good, no traits without variance.")
+    trial_rm_sd = my_dat
+  }else{ 
+    print("The traits without variation are:")
+    print(sd_mean_0)
+    
+    analysis_trait = analysis_trait[!analysis_trait %in% sd_mean_0$trait]
+    
+    trial_rm_sd = my_dat %>%
+      select(all_of(meta_info), all_of(analysis_trait))
+    print("We have removed the trait with SD=0")
+    return(trial_rm_sd)
+    
+  }
 }
 
-if (nrow(sd_mean_0) >0) {
-  print("The traits without variation:")
-  paged_table(sd_mean_0)
-  print("Remove the traits from the trial data")
-  
-  
-  analysis_trait = analysis_trait[!analysis_trait %in% sd_mean_0$trait]
-  
-  trial_rm_sd = my_dat %>%
-    select(all_of(meta_info), all_of(analysis_trait))
-  return(my_dat)
-}
-
-print("We removed the trait with SD=0")
-
-}
 
 
 #### __7. count of clones in each trial and environment__
