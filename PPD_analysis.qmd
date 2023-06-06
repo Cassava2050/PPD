@@ -81,6 +81,8 @@ obs_col <- c(
 
 sel_data_kp %<>%
   mutate(across(all_of(obs_col), as.numeric))
+
+names(sel_data_kp) = gsub("-", "_", names(sel_data_kp))
 ```
 
 # Check the clone name
@@ -182,19 +184,6 @@ for (i in 1:length(trait_wanted)) {
   plot(plot_box)
 }
 ```
-
-## Save the plot variation in my local folder
-
-```{r eval=FALSE}
-BOXPLOT_VAR(my_dat = trial_tidy)
-```
-
-## Get the shared clones
-
-```{r eval=FALSE}
-CLONE_CT(my_dat = trial_tidy)
-```
-
 ## Select traits for the analysis
 
 ```{r}
@@ -515,24 +504,24 @@ my_dat <- bind_rows(trials_10mon, trials_12mon) %>%
   left_join(PPD, by = c("trial_name", "plot_name"))
 ```
 
-## QC data
+# removing some unreliable data
 
-```{r eval=FALSE}
-
-if (FALSE) {
-  my_dat %>%
-    select(height, height_1st_branch) %>%
-    mutate(doHeightlargerheight_branch = ifelse(height > height_1st_branch, "true",
-      ifelse(height < height_1st_branch, "check", "equal")
-    )) %>%
-    distinct(height, height_1st_branch, doHeightlargerheight_branch) %>%
-    filter(doHeightlargerheight_branch %in% c("check", "equal"))
+```{r}
+if (trial_interest == "PDGN1") { # remove all HCN values from 2016 trials (not trusted data)
+  my_dat[str_detect(my_dat$trial_name, "2016|2017|2018|2019"), 18] <- NA
 }
+
 ```
 
 ## Save the data raw pivot
 
+```{r eval=FALSE}
+write.csv(my_dat, here::here("output", paste("01_", year_interest, trial_interest, "_tidy_data4analysis_", Sys.Date(), ".csv", sep = "")), row.names = FALSE)
+```
+
+
 ```{r}
+
 master_data[[paste0("raw_data_pivot_", trial_interest)]] <- my_dat
 ```
 
@@ -572,14 +561,11 @@ if (trial_interest == "BCGN1") {
 }
 ```
 
+
+
 ## Variance boxplot
 
 ```{r warning=FALSE}
-
-if (trial_interest == "PDGN1") { # remove all HCN values from 2016 trials (not trusted data)
-  my_dat[str_detect(my_dat$trial_name, "2016|2017|2018|2019"), 18] <- NA
-}
-
 
 fct_labels <- c(
   DM_raw = "Dry matter by oven (%)",
@@ -631,42 +617,15 @@ plot_bxp <- my_dat %>%
 plot_bxp
 
 
-  ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
-    plot = plot_bxp, units = "in", dpi = 300, width = 10, height = 7
-  )
+  # ggsave(paste0("images\\boxplot_", trial_interest, Sys.Date(), ".png"),
+  #   plot = plot_bxp, units = "in", dpi = 300, width = 10, height = 7
+  # )
 
-```
-
-## Individual boxplots
-
-```{r warning=FALSE}
-for (i in 1:length(trait_ideal_pivot)) {
-  y_DATA <- my_dat[[trait_ideal_pivot[i]]]
-  x_DATA <- my_dat$trial_name
-  my_DATA <- my_dat
-  y_LABEL <- trait_ideal_pivot[i]
-  x_LABEL <- NULL
-  TITLE <- NULL
-  y_MAX <- max(y_DATA, na.rm = TRUE) * 1.2
-  y_MIN <- 0
-
-  plot_box <- ggplot(my_DATA, aes(x = x_DATA, y = y_DATA)) +
-    geom_violin(trim = FALSE, fill = "gray") +
-    geom_boxplot(width = 0.2) +
-    coord_cartesian(ylim = c(y_MIN, y_MAX)) +
-    theme_xiaofei() +
-    labs(
-      y = y_LABEL, x = x_LABEL,
-      title = TITLE
-    )
-  plot(plot_box)
-  # ggsave(paste0("images/", trait_ideal_pivot[i], "_", trial_interest, Sys.Date(), ".png")  , plot_box, width = 8, height = 4)
-}
 ```
 
 # Shared information
 
-```{r}
+```{r warning=FALSE, message=FALSE}
 
 my_dat <- my_dat %>% mutate(
   accession_name = as.factor(accession_name),
@@ -680,15 +639,15 @@ for (var in trait_ideal_pivot) {
     spread(trial_name, avg)
 
   g1 <-
-    ggCor(MM, returnN = TRUE) +
+    gg_cor(MM, returnN = TRUE) +
     labs(title = "Shared information", subtitle = var) +
     theme_minimal(base_size = 10) +
     theme(
       axis.text.x = element_text(angle = 40, hjust = 1), legend.position = "none",
       panel.grid.minor.x = element_blank(), panel.grid.major = element_blank()
     )
-  g1
-  ggsave(paste0("images/", var, trial_interest, Sys.Date(),".png"), g1, units = "in", dpi = 300, width = 7, height = 7)
+  print(g1)
+  # ggsave(paste0("images/", var, trial_interest, Sys.Date(),".png"), g1, units = "in", dpi = 300, width = 7, height = 7)
 }
 ```
 
@@ -753,7 +712,7 @@ for (var in trait_ideal_pivot) {
 
   model_MET_2stage <- asreml(
     fixed = eqt_fixed,
-    random = ~ fa(trial_name, 2):accession_name,
+    random = ~ fa(trial_name, 1):accession_name,
     data = my_dat %>% filter(trial_name %in% trials) %>% droplevels(),
     family = asr_gaussian(dispersion = 1),
     na.action = list(x = "exclude", y = "exclude"),
@@ -762,6 +721,8 @@ for (var in trait_ideal_pivot) {
 
   model_MET_2stage <- update.asreml(model_MET_2stage)
   model_MET_2stage <- update.asreml(model_MET_2stage)
+  model_MET_2stage <- update.asreml(model_MET_2stage)
+  
   pred_f <- predict(model_MET_2stage, classify = "accession_name")
   PP <- pred_f$pvals %>% mutate(variable = var)
 
@@ -769,8 +730,8 @@ for (var in trait_ideal_pivot) {
     model_fa = model_MET_2stage,
     genotype = "accession_name",
     env = "trial_name",
-    vc.model = "fa2"
-  )$H2Cullis
+    vc_model = "fa1"
+  )
   names(h2_fa2)[i] <- var
 
   if (i == 1) {
@@ -839,9 +800,8 @@ sapply(my_dat[trait_ideal_pivot], multiple.func)
 ```{r}
 
 h2 <- h2_fa2 %>%
-  as.data.frame() %>%
-  tibble::rownames_to_column("trait")
-colnames(h2) <- c("var", "h2")
+  as.data.frame() %>% 
+  pivot_longer(cols = everything(), names_to = "trait", values_to = "h2")
 
 # save the heritability
 master_data[[paste0("h2_", trial_interest)]] <- h2
@@ -892,9 +852,58 @@ for (var in trait_ideal_pivot) {
 }
 ```
 
+## BLUE and BLUP data together
+
+```{r}
+BLUEs <- my_dat %>% select(trial_name, accession_name, trait_ideal_pivot) %>% 
+  pivot_wider(names_from = trial_name, values_from = trait_ideal_pivot)
+
+colnames(BLUEs)[-1] <- paste("BLUEs", colnames(BLUEs)[-1], sep = "_")
+
+BLUEs_BLUPs <- BLUEs %>% 
+  left_join(pvals_table %>%
+  select(-c(status)) %>%
+  group_by(variable, accession_name) %>% 
+      rename(
+        BLUPs = predicted.value,
+        seBLUPs = std.error
+      ) %>%
+      pivot_wider(names_from = "variable", values_from = c("BLUPs", "seBLUPs")),
+    by = "accession_name"
+  ) %>% 
+  arrange(desc(BLUPs_DM_raw)) %>% 
+  arrange(is.na(across(where(is.numeric))), across(where(is.numeric))) %>%
+  mutate(across(where(is.numeric), round, 2))
+
+ # remove all NA columns
+BLUEs_BLUPs <- BLUEs_BLUPs[, colSums(is.na(BLUEs_BLUPs)) < nrow(BLUEs_BLUPs)]
+
+# sort header
+header_sort = vector()
+for (i in 1:length(trait_ideal_pivot)) {
+  
+  header_sort = c(header_sort, 
+                  grep(trait_ideal_pivot[i], sort(names(BLUEs_BLUPs)), value=TRUE) 
+  )
+  
+}
+
+BLUEs_BLUPs <- BLUEs_BLUPs %>%
+  select(accession_name, all_of(header_sort)) 
+
+
+BLUEs_BLUPs <- BLUEs_BLUPs %>% 
+  relocate(colnames(BLUEs_BLUPs)[str_detect(colnames(BLUEs_BLUPs), "DM_raw")], .after = accession_name)
+
+
+master_data[["BLUEs_BLUPs_MET"]] = BLUEs_BLUPs
+
+```
+
 ## Save the master data
 
 ```{r}
+folder_output <- here::here("output//")
 
 # In some cases there were long names that need to be replace
 # names(master_data)[11] <- "BLUP_BLUE__1st_branch_BCGN1"
@@ -902,24 +911,23 @@ for (var in trait_ideal_pivot) {
 # names(master_data)[15] <- "BLUP_BLUE__bcaroteno_BCGN1"
 # names(master_data)[16] <- "BLUP_BLUE__caroteno_BCGN1"
 
-meta_file_name <- paste0(folder, paste0(experiment, "_", trial_interest, "_master_results_",
-  Sys.Date(), "_.xlsx"
-)
-)
+meta_file_name <- paste0(folder_output, paste0("2022", trial_interest, "_master_results_", Sys.Date(), ".xlsx"))
+
+
 write.xlsx(master_data, file = meta_file_name)
 ```
 
 ## Load the BLUPs data
 
 ```{r}
-list_file <- list.files(folder)
+list_file <- list.files(folder_output)
 
 sel_file <- list_file[str_detect(list_file, "_master_results_") &
   str_detect(list_file, trial_interest)]
 
 sel_file[1]
 blupDF_kp <- read_excel(
-  paste(folder,
+  paste(folder_output,
     sel_file[1],
     sep = ""
   ),
@@ -934,17 +942,26 @@ blupDF_kp %>%
 
 # Genetic correlation
 
-See the script call it "correlations". Was not possible to export the file using dev.off() function;
-I need to find the way to use that function inside of a Quarto document.
+```{r}
+colnames(blupDF_kp) = c("accession_name", "Cooking time (min)", "Dry matter by oven (%)", "Cyanide content (ppm)", "Plant height (cm)", "PPD", "Yield (t/ha)")
+
+correlation <- gg_cor(
+  colours = c("red", "white", "blue"),
+  data = blupDF_kp,
+  label_size = 4
+  )
+# ggsave(paste("images\\geno_corr", trial_interest, Sys.Date(), ".png", sep = "_"),
+#      plot = correlation, units = "in", dpi = 300, width = 12, height = 8
+#    )
+```
 
 
 ## Selection index
 
 ```{r}
-
 index_col <- c(
-  "ppd", "cook_time", "DM_raw", "HCN_linamarase",
-  "yield_ha"
+  "PPD", "Cooking time (min)", "Dry matter by oven (%)", "Cyanide content (ppm)",
+  "Yield (t/ha)"
 )
 
 index_dat <- blupDF_kp %>%
@@ -952,7 +969,7 @@ index_dat <- blupDF_kp %>%
   column_to_rownames("accession_name")
 ```
 
-## Johan's function
+## Selection function
 
 ```{r}
 # multi-trait -------------------------------------------------------------
@@ -1036,13 +1053,11 @@ selIndex <- function (Y, b, scale = FALSE)
 
 # PCA
 pcs <- index_dat %>%
-  dplyr::select_if(is.numeric) %>%
+  dplyr::select(-c("Cooking time (min)")) %>%
   drop_na()
 
 pca <- PCA(pcs)
 
-# Interactiva
-explor(pca)
 ```
 
 ## Eigenvalues
@@ -1066,7 +1081,7 @@ ggsave(paste0("images/PCA_var_", trial_interest, Sys.Date(), ".png"), plot = var
 
 ```{r}
 # IND
-IND <- fviz_pca_ind(pca, repel = T, alpha.ind = 0.3, col.ind = "grey20", labelsize = 3) +
+IND <- fviz_pca_ind(pca, repel = T, alpha.ind = 0.3, col.ind = "grey20", labelsize = 2) +
   ggtitle(paste0("Individuals - PCA_", pop)) +
   theme_xiaofei()
 
@@ -1106,24 +1121,96 @@ ggsave(paste0("images/biplot", trial_interest, Sys.Date(), ".png"), plot = test,
 
 TestIndex_ <- index_dat %>%
   rownames_to_column("accession_name") %>%
-  drop_na() #%>%
-  select(-c(cook_time))
+  drop_na() %>%
+  select(-c("Cooking time (min)"))
 
 
-res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, -10, 10, -10, 10), percentage = 0.20)
+res.pca <- pca_index(data = TestIndex_, id = "accession_name", b = c(-10, 10, -10, 10), percentage = 0.20)
 res.pca_final <- res.pca$final
 res.pca_final
 ggsave(paste("images/selection",  trial_interest, Sys.Date(), ".png"), plot = res.pca_final, units = "in", dpi = 300, width = 10, height = 10)
 
 res.pca$selection
-res.pca$results %>% 
-  mutate(across(where(is.numeric), round, 3)) %>% 
-  write.table("clipboard", sep="\t", row.names=TRUE, col.names=TRUE)
-dim(res.pca$selection)
-
-
-
-
+selections <- res.pca$results %>% rownames_to_column(var = "accession_name") %>% 
+  mutate(across(where(is.numeric), round, 2))
 ```
 
-CPDCR5B-102, CPDCR5B-055, CPDCR1B-034
+## Add index column to BLUEs_BLUPs_MET
+
+```{r}
+BLUEs_BLUPs <- 
+  master_data$BLUEs_BLUPs_MET %>% 
+  left_join(selections[-c(2:5)], by = c("accession_name" = "accession_name")) %>% 
+  select(accession_name, index, selected, everything())
+
+BLUEs_BLUPs <- BLUEs_BLUPs %>% 
+  arrange(is.na(selected))
+master_data[["BLUEs_BLUPs_MET"]] = BLUEs_BLUPs
+```
+
+
+
+# Cluster analysis
+
+```{r warning=FALSE, message=FALSE}
+
+#cluster tree
+hcpc <- HCPC(pca, nb.clust = 0, method = "ward", graph = FALSE)
+
+fviz_dend(hcpc, 
+          cex = 0.6,
+          palette = "lancet",
+          rect = TRUE, 
+          rect_fill = TRUE,
+          rect_border = "lancet",
+          labels_track_height = 0.1,
+          horiz = T)
+```
+
+## Cluster under PCA
+
+The next plot is the clustering plot, but this time in the space of the principal components.
+
+```{r message=FALSE, warning=FALSE}
+hcpc_pca <- fviz_cluster(hcpc,
+             repel = TRUE,
+             show.clust.cent = FALSE,
+             labelsize = 10,
+             ellipse.type = "euclid",
+             ggtheme = theme_xiaofei())
+
+ggsave(paste("images/cluster",  trial_interest, Sys.Date(), ".png", sep = "_"), plot = hcpc_pca, units = "in", dpi = 300, width = 10, height = 10)
+```
+
+## Significant variables in each cluster
+
+```{r}
+hcpc$desc.var$quanti
+```
+
+# Asignacion de cluster a cada accession_name
+
+
+```{r}
+cluster_asignados <- hcpc$data.clust
+
+cluster_asignados <- cluster_asignados %>% rownames_to_column("accession_name") %>% select(accession_name, clust, everything())
+
+BLUEs_BLUPs <- 
+  master_data$BLUEs_BLUPs_MET %>% 
+  left_join(cluster_asignados[c(1:2)], by = c("accession_name" = "accession_name")) %>% 
+  select(accession_name, clust, everything())
+```
+
+## Save the master data results
+
+```{r}
+folder_output <- here::here("output//")
+meta_file_name <- paste0(folder_output, paste("2022", trial_interest, "master_results", Sys.Date(), ".xlsx", sep = "_"))
+
+
+write.xlsx(master_data, file = meta_file_name)
+```
+
+
+
