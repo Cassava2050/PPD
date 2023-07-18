@@ -1,3 +1,21 @@
+library(pacman)
+pacman::p_load(tidyverse, 
+               fauxnaif, 
+               readxl, 
+               yarrr, 
+               statgenSTA, 
+               statgenGxE, 
+               openxlsx, 
+               QBMS, 
+               agriutilities, 
+               # asreml, 
+               SpATS, 
+               ggsci,
+               lubridate,
+               magrittr)
+source("https://raw.githubusercontent.com/Cassava2050/PPD/main/utilities_tidy.R")
+
+
 # Functions to make tidy data
 
 read_cassavabase <- function(phenotypeFile) {
