@@ -41,7 +41,7 @@ ifelse(is.na(indata),
 # Load the theme used
 theme_xiaofei <- function(){ 
   theme_gray() %+replace%
-    theme(axis.text.x = element_text(face = "bold", colour = "black", size = 8, angle = 45),
+    theme(axis.text.x = element_text(face = "bold", colour = "black", size = 8, angle = 45, hjust = 1, vjust = 1),
           axis.text.y = element_text(face = "bold", colour="black", size = 8),
           axis.title.y = element_text(size = 12,face = "bold", angle = 90, vjust = 3) ,
           axis.title.x = element_text(size = 12,face = "bold", vjust = -0.5) ,
