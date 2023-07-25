@@ -44,7 +44,7 @@ theme_xiaofei <- function(){
     theme(axis.text.x = element_text(face = "bold", colour = "black", size = 8, angle = 45, hjust = 1),
           axis.text.y = element_text(face = "bold", colour="black", size = 8),
           axis.title.y = element_text(size = 12,face = "bold", angle = 90, vjust = 3) ,
-          axis.title.x = element_text(size = 12,face = "bold", vjust = -0.5) ,
+          axis.title.x = element_text(size = 12,face = "bold") ,
           plot.title = element_text(size = 16, face = "bold.italic", hjust = 0.5),
           plot.margin = unit(c(1,1,1,2), "cm") # top, right, bottom, left
           #legend.position = "none"
