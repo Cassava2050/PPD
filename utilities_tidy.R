@@ -763,6 +763,69 @@ clone_ct_info <<- clone_ct_info
 
 }
 
+# plot matrix shared clones among environments (ggplot2)
+
+shared_cor <- function (matrix, corr = F, size = 4, digits = 3, legend = c(0.6, 
+                                                                           0.7)) 
+{
+  matrix <- round(x = matrix, digits = digits)
+  get_upper_tri <- function(cormat) {
+    cormat[lower.tri(cormat)] <- NA
+    return(cormat)
+  }
+  reorder_cormat <- function(cormat) {
+    dd <- stats::as.dist((1 - cormat)/2)
+    hc <- stats::hclust(dd)
+    cormat <- cormat[hc$order, hc$order]
+  }
+  if (corr) {
+    matrix <- reorder_cormat(matrix)
+  }
+  upper_tri <- as.data.frame(get_upper_tri(matrix))
+  col_names <- colnames(upper_tri)
+  upper_tri[, "col"] <- factor(x = col_names, levels = col_names)
+  melted_cormat <- tidyr::gather(data = upper_tri, key = "row", 
+                                 value = "value", -col, na.rm = TRUE, factor_key = TRUE)
+  colnames(melted_cormat) <- c("Var1", "Var2", "value")
+  u <- -1
+  m <- 0
+  l <- 1
+  main <- "Correlation"
+  col_pallete <- c("#db4437", "white", "#4285f4")
+  col_letter <- "black"
+  if (isFALSE(corr)) {
+    u <- min(matrix, na.rm = TRUE)
+    l <- max(matrix, na.rm = TRUE)
+    m <- 0 #u + (l - u)/2
+    main <- "Covariance"
+    col_pallete <- c("#db4437", "white", "#4285f4")
+    col_letter <- "black"
+  }
+  melted_cormat$Var1 <- as.factor(melted_cormat$Var1)
+  melted_cormat$Var2 <- as.factor(melted_cormat$Var2)
+  ggheatmap <- ggplot2::ggplot(data = melted_cormat, mapping = ggplot2::aes(Var2, 
+                                                                            Var1, fill = value)) + 
+    ggplot2::geom_tile(color = "black") + 
+    ggplot2::scale_fill_gradient2(low = col_pallete[1], high = col_pallete[3],
+                                  mid = col_pallete[2], midpoint = m, limit = c(u,
+                                                                                l), space = "Lab", name = main) +
+    ggplot2::theme_minimal() + 
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, size = 12), #,vjust = 0.5, size = 12, hjust = 1), 
+                   axis.text.y = ggplot2::element_text(size = 12))
+  plot <- ggheatmap + ggplot2::geom_text(mapping = ggplot2::aes(Var2, 
+                                                                Var1, label = value), color = col_letter, size = size) + 
+    ggplot2::theme(axis.title.x = ggplot2::element_blank(), 
+                   axis.title.y = ggplot2::element_blank(), panel.grid.major = ggplot2::element_blank(), 
+                   panel.border = ggplot2::element_blank(), panel.background = ggplot2::element_blank(), 
+                   axis.ticks = ggplot2::element_blank()) +
+    #legend.justification = c(1, 0), legend.position = legend, legend.direction = "horizontal") + 
+    ggplot2::guides(fill = ggplot2::guide_colorbar(barwidth = 7, 
+                                                   barheight = 1, title.position = "top", title.hjust = 0.5)) +
+    scale_y_discrete(position = "right")
+  return(plot)
+}
+
+
 
 
 
