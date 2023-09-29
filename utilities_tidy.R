@@ -268,7 +268,8 @@ check_clone_name = function(clone_list,
   known_clone = c("C19", "C243", "C33", "C39", "C413", "TME3", "HB60" , "KU50", 
                   "C4", "BB1", "BB2", "BB3", "KM505", "TMEB419", "Azulita", "Chocoana",
                   "CR52A2", "CR52A4", "CR60B10", "FalsaReina", "FALSAREINA", "TME287", 
-                   "P13", "CMB8527", "Chirosa")
+                  "P13", "CMB8527", "Chirosa", "HLS15", "KM140", "KM419", "KM94", "13SA05",
+                  "BK", "Rayong11", "IBA972205", "IBA920057", "IBA980505", "N30")
   cat("The other known clones:")
   print(sort(known_clone))
   
