@@ -827,45 +827,44 @@ shared_cor <- function (matrix, corr = F, size = 4, digits = 3, legend = c(0.6,
   return(plot)
 }
 
-
-
-
-
 #### __8. visualize the variation within and among trials using boxplot__
 # ---- function
 
-BOXPLOT_VAR_tidy = function (my_dat,
-                        trait_wanted){
-# remove columns with all NA
-not_all_na = function(x) any(!is.na(x))
-my_dat_noNA = my_dat %>% select_if(not_all_na)
-
-# save as PDF, can adjust the figure size
-pdf(paste(folder, "01_", experiment, "_boxplot_",
-          Sys.Date(),".pdf", sep=""), width = 6, height = 6)
-
-for(i in 1: length(trait_wanted)){
-  y_DATA = my_dat_noNA[[trait_wanted[i]]]   # data frame or vector?
-  x_DATA = my_dat_noNA$trial_name
-  my_DATA = my_dat_noNA
-  y_LABEL = trait_wanted[i]
-  x_LABEL = NULL
-  TITLE = trait_wanted[i]
-  y_MAX = max(y_DATA, na.rm = TRUE) * 1.2
-  y_MIN = 0
+boxplot_traits <- function(my_dat, trait_wanted, folder, trial_interest){
+  # Remove columns with all NA
+  not_all_na <- function(x) any(!is.na(x))
+  my_dat_noNA <- my_dat %>% select_if(not_all_na)
   
-  plot_box = ggplot(my_DATA, aes(x = x_DATA, y = y_DATA))+
-    geom_violin(trim = FALSE, fill="gray")+
-    geom_boxplot(width = 0.2, trim = FALSE) +
-    coord_cartesian(ylim = c(y_MIN,y_MAX))+
-    theme_xiaofei  +
-    labs(y = y_LABEL , x = x_LABEL,
-         title = TITLE)
-  plot(plot_box)
-}
-dev.off()
-}
+  # Define a function to create and plot a boxplot for a single trait
+  plot_trait <- function(trait_wanted) {
+    y_DATA <- my_dat_noNA[[trait_wanted]]
+    x_DATA <- my_dat_noNA$trial_name
+    my_DATA <- my_dat_noNA
+    y_LABEL <- trait_wanted
+    x_LABEL <- NULL
+    TITLE <- trait_wanted
+    y_MAX <- max(y_DATA, na.rm = TRUE) * 1.2
+    y_MIN <- 0
+    
+    plot_box <- ggplot(my_DATA, aes(x = x_DATA, y = y_DATA))+
+      geom_violin(trim = FALSE, fill="gray")+
+      geom_boxplot(width = 0.2, trim = FALSE) +
+      coord_cartesian(ylim = c(y_MIN,y_MAX))+
+      theme_xiaofei()  +
+      labs(y = y_LABEL , x = x_LABEL,
+           title = TITLE)
+    
+    print(plot_box)
+  }
+  
+  # Save as PDF, can adjust the figure size
+  pdf(paste(folder, "01_", trial_interest, "_boxplot_", Sys.Date(), 
+            ".pdf", sep = ""), width = 6, height = 6)
+  
+  # Use purrr to iterate over traits and plot each
+  walk(trait_wanted, plot_trait)
 
+}
 
 #### __ 12.1 BLUE boxplot 
 
