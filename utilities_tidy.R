@@ -209,7 +209,7 @@ trial_layout <- function(trial = sel_data_kp) {
 
     print(myplot)
     
-    ggsave(paste("images\\layout", trial_list[i], Sys.Date(), ".png", sep = "_"),
+    ggsave(paste("images\\layout", trial_list[i], ".png", sep = "_"),
        plot = myplot, units = "in", dpi = 300, width = 14, height = 12)
   }
 }
@@ -515,7 +515,7 @@ BOXPLOT_VAR = function (my_dat){
   
     # save as PDF, can adjust the figure size
   pdf(paste(folder, "01_", year_interest, trial_interest, "_boxplot_",
-            Sys.Date(),".pdf", sep=""), width = 4, height = 6)
+            ".pdf", sep=""), width = 4, height = 6)
   
   for(i in 1: length(trait_wanted)){
     y_DATA = my_dat_noNA[[trait_wanted[i]]]   # data frame or vector?
@@ -603,7 +603,7 @@ CLONE_CT = function(my_dat ){
     arrange( desc(plot_ct) )
   
   write.csv(clone_ct_info, paste(folder, "01_", year_interest, trial_interest,
-                                 "_clone_ct_", Sys.Date(),".csv", sep=""), row.names=FALSE)
+                                 "_clone_ct_", ".csv", sep=""), row.names=FALSE)
 }
 
 ### 2.16   select traits for analysis *******************
@@ -858,7 +858,7 @@ boxplot_traits <- function(my_dat, trait_wanted, folder, trial_interest){
   }
   
   # Save as PDF, can adjust the figure size
-  pdf(paste(folder, "01_", trial_interest, "_boxplot_", Sys.Date(), 
+  pdf(paste(folder, "01_", trial_interest, "_boxplot_", 
             ".pdf", sep = ""), width = 6, height = 6)
   
   # Use purrr to iterate over traits and plot each
@@ -876,7 +876,7 @@ my_dat_noNA = my_dat %>% select_if(not_all_na)
 
 # save as PDF, can adjust the figure size
 pdf(paste(folder, "01_", experiment, "_BLUE_boxplot_",
-          Sys.Date(),".pdf", sep=""), width = 4, height = 6)
+          ".pdf", sep=""), width = 4, height = 6)
 
 
 for(i in 1: length(trait_wanted_blue)){
