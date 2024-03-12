@@ -837,36 +837,31 @@ boxplot_traits <- function(my_dat, trait_wanted, folder, trial_interest){
   
   # Define a function to create and plot a boxplot for a single trait
   plot_trait <- function(trait_wanted) {
-    y_DATA <- my_dat_noNA[[trait_wanted]]
-    x_DATA <- my_dat_noNA$trial_name
     my_DATA <- my_dat_noNA
     y_LABEL <- trait_wanted
     x_LABEL <- NULL
     TITLE <- trait_wanted
-    y_MAX <- max(y_DATA, na.rm = TRUE) * 1.2
+    y_MAX <- max(my_DATA[[trait_wanted]], na.rm = TRUE) * 1.2
     y_MIN <- 0
     
-    plot_box <- ggplot(my_DATA, aes(x = x_DATA, y = y_DATA))+
-      geom_violin(trim = FALSE, fill="gray")+
+    plot_box <- ggplot(my_DATA, aes_string(x = "trial_name", y = trait_wanted)) +
+      geom_violin(trim = FALSE, fill="gray") +
       geom_boxplot(width = 0.2, trim = FALSE) +
-      coord_cartesian(ylim = c(y_MIN,y_MAX))+
-      theme_xiaofei()  +
-      labs(y = y_LABEL , x = x_LABEL,
-           title = TITLE)
+      coord_cartesian(ylim = c(y_MIN, y_MAX)) +
+      theme_minimal() +  # Replace theme_xiaofei() with a standard theme if not defined
+      labs(y = y_LABEL, x = x_LABEL, title = TITLE)
     
     print(plot_box)
   }
   
   # Save as PDF, can adjust the figure size
-  pdf(paste(folder, "01_", trial_interest, "_boxplot_", 
-            ".pdf", sep = ""), width = 6, height = 6)
+  pdf(paste(folder, "01_", trial_interest, "_boxplot_", ".pdf", sep = ""), width = 6, height = 6)
   
   # Use purrr to iterate over traits and plot each
   walk(trait_wanted, plot_trait)
-
+  
   # Close the PDF device
   dev.off()
-
 }
 
 #### __ 12.1 BLUE boxplot 
