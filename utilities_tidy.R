@@ -864,6 +864,9 @@ boxplot_traits <- function(my_dat, trait_wanted, folder, trial_interest){
   # Use purrr to iterate over traits and plot each
   walk(trait_wanted, plot_trait)
 
+  # Close the PDF device
+  dev.off()
+
 }
 
 #### __ 12.1 BLUE boxplot 
