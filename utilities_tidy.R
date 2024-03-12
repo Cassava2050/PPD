@@ -848,7 +848,7 @@ boxplot_traits <- function(my_dat, trait_wanted, folder, trial_interest){
       geom_violin(trim = FALSE, fill="gray") +
       geom_boxplot(width = 0.2, trim = FALSE) +
       coord_cartesian(ylim = c(y_MIN, y_MAX)) +
-      theme_minimal() +  # Replace theme_xiaofei() with a standard theme if not defined
+      theme_xiaofei() +
       labs(y = y_LABEL, x = x_LABEL, title = TITLE)
     
     print(plot_box)
